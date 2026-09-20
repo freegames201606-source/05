@@ -1,6 +1,15 @@
 * { box-sizing: border-box; }
+
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+}
+
 html, body {
-  margin: 0; height: 100%; background: #0d0d12; overflow: hidden;
+  margin: 0; height: 100%;
+  background: #0d0d12; overflow: hidden;
   font-family: -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN", sans-serif;
   color: #fff;
   user-select: none;
@@ -16,10 +25,18 @@ canvas { display: block; touch-action: none; }
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
   gap: 14px; z-index: 20;
-  padding: 20px;
+  padding:
+    calc(20px + var(--sat))
+    calc(20px + var(--sar))
+    calc(20px + var(--sab))
+    calc(20px + var(--sal));
+  touch-action: manipulation;
 }
 #levelup.hidden { display: none; }
-#levelup h2 { margin: 0; font-size: 26px; color: #ffd54f; letter-spacing: 2px; }
+#levelup h2 {
+  margin: 0; font-size: 26px; color: #ffd54f; letter-spacing: 2px;
+  text-shadow: 0 0 16px rgba(255,213,79,0.7);
+}
 #levelup p { margin: 0; opacity: 0.8; font-size: 14px; }
 #choices {
   display: flex; flex-direction: column; gap: 10px;
@@ -44,8 +61,14 @@ canvas { display: block; touch-action: none; }
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
   gap: 14px; z-index: 30;
-  padding: 24px;
+  padding:
+    calc(24px + var(--sat))
+    calc(24px + var(--sar))
+    calc(24px + var(--sab))
+    calc(24px + var(--sal));
   text-align: center;
+  touch-action: manipulation;
+  pointer-events: auto;
 }
 #overlay.hidden { display: none; }
 #overlay-title {
@@ -59,6 +82,15 @@ canvas { display: block; touch-action: none; }
   font-size: 13px; opacity: 0.7; line-height: 1.6;
 }
 #overlay-help p { margin: 0; }
+
+#hiscore-line {
+  margin: 6px 0 4px;
+  font-size: 14px;
+  color: #ffd54f;
+  letter-spacing: 1px;
+}
+#hiscore-value { font-weight: bold; }
+
 #startBtn {
   padding: 14px 40px; font-size: 18px; font-weight: bold;
   background: #4fc3f7; color: #0d0d12;
@@ -66,5 +98,6 @@ canvas { display: block; touch-action: none; }
   cursor: pointer;
   box-shadow: 0 0 24px rgba(79,195,247,0.5);
   transition: transform 0.1s;
+  touch-action: manipulation;
 }
 #startBtn:active { transform: scale(0.96); }
