@@ -1,8 +1,9 @@
 /* =========================================================
-   Vansaba - 変更01 + 変更移動
+   Vansaba - 変更01 + 変更移動 + スマホSTART修正
    - レベルアップ / 経験値 / 複数武器 / 複数敵種
    - SVG敵 / Web Audio 合成 / スタート画面
    - 入力：PCマウス追従 + スマホバーチャルスティック
+   - スマホのSTARTタップ対応（pointerdown/touchend + AudioContext同期init）
    ========================================================= */
 
 const canvas = document.getElementById('game');
@@ -36,10 +37,8 @@ resize();
    - タッチ：バーチャルスティック（指を置いた点が基点）
    ========================================================= */
 
-// 移動ベクトル（正規化前。-1〜1程度に収まる）
 const move = { dx: 0, dy: 0, active: false };
 
-// タッチ用スティック状態
 const stick = {
   active: false,
   baseX: 0, baseY: 0,
@@ -49,9 +48,15 @@ const stick = {
 };
 let lastPointerType = 'mouse';
 
+function overlayVisible() {
+  return !overlayEl.classList.contains('hidden') ||
+         !levelupEl.classList.contains('hidden');
+}
+
 /* ---------- マウス ---------- */
 canvas.addEventListener('mousemove', e => {
   if (lastPointerType === 'touch') return;
+  if (overlayVisible()) return;
   lastPointerType = 'mouse';
   const dx = e.clientX - player.x;
   const dy = e.clientY - player.y;
@@ -70,6 +75,7 @@ canvas.addEventListener('mouseleave', () => {
 
 /* ---------- タッチ ---------- */
 canvas.addEventListener('touchstart', e => {
+  if (overlayVisible()) return; // オーバーレイ表示中はcanvasタッチ無効
   e.preventDefault();
   lastPointerType = 'touch';
   const t = e.touches[0];
@@ -82,6 +88,7 @@ canvas.addEventListener('touchstart', e => {
 }, { passive: false });
 
 canvas.addEventListener('touchmove', e => {
+  if (overlayVisible()) return;
   e.preventDefault();
   lastPointerType = 'touch';
   if (!stick.active) return;
@@ -104,6 +111,7 @@ canvas.addEventListener('touchmove', e => {
 }, { passive: false });
 
 function endTouch(e) {
+  if (overlayVisible()) return;
   e.preventDefault();
   lastPointerType = 'touch';
   stick.active = false;
@@ -156,6 +164,7 @@ let stats;
 let lastTime;
 let pendingLevelUps = 0;
 let started = false;
+let loopRunning = false;
 
 function resetGame() {
   player = {
@@ -342,7 +351,6 @@ function update(dt) {
   if (gameOver || paused) return;
   elapsed += dt;
 
-  // 移動（変更移動：move ベクトルに従う）
   if (move.active) {
     const sp = player.speed * stats.moveSpeedMul;
     const len = Math.hypot(move.dx, move.dy) || 1;
@@ -466,4 +474,239 @@ const UPGRADES = [
   { id: 'basic_rate',   name: '基本攻撃 連射', desc: '基本武器の間隔 -15%',         apply: s => s.weapons.basic.interval = Math.max(0.12, s.weapons.basic.interval * 0.85) },
   { id: 'basic_pierce', name: '基本攻撃 貫通', desc: '基本武器が1体貫通',           apply: s => s.weapons.basic.pierce += 1 },
   { id: 'spread',       name: '拡散ショット',   desc: '扇状に複数弾（Lv+1）',        apply: s => { s.weapons.spread.level++; s.weapons.spread.damage += 2; } },
-  { id: 'orbit',        name: '回転バリア',     desc: '周囲を回る弾（Lv+1）',        apply: s => { s.weapons.orbit.level++; s.weapons.orbit.count++; s.weapons.orbit.damage
+  { id: 'orbit',        name: '回転バリア',     desc: '周囲を回る弾（Lv+1）',        apply: s => { s.weapons.orbit.level++; s.weapons.orbit.count++; s.weapons.orbit.damage += 3; } },
+  { id: 'laser',        name: '貫通レーザー',   desc: '直線上に大ダメージ',          apply: s => { s.weapons.laser.level++; s.weapons.laser.damage += 15; s.weapons.laser.interval = Math.max(1.0, s.weapons.laser.interval - 0.2); } },
+  { id: 'speed',        name: '移動速度 UP',    desc: '移動速度 +12%',               apply: s => s.moveSpeedMul *= 1.12 },
+  { id: 'maxhp',        name: '最大HP UP',      desc: '最大HP +25 & 全回復',         apply: s => { player.maxHp += 25; player.hp = player.maxHp; } },
+  { id: 'regen',        name: 'HP自動回復',     desc: '毎秒 +1.5 HP',                apply: s => s.regen += 1.5 },
+  { id: 'pickup',       name: '取得範囲 UP',    desc: '経験値の吸引範囲 +40',        apply: s => s.pickupRange += 40 },
+  { id: 'expmul',       name: '経験値 UP',      desc: '獲得経験値 +25%',             apply: s => s.expMul *= 1.25 },
+];
+
+function showLevelUpChoices() {
+  if (pendingLevelUps <= 0) {
+    paused = false;
+    levelupEl.classList.add('hidden');
+    lastTime = performance.now();
+    return;
+  }
+  paused = true;
+  levelupEl.classList.remove('hidden');
+  choicesEl.innerHTML = '';
+
+  const pool = [...UPGRADES];
+  const picked = [];
+  for (let i = 0; i < 3 && pool.length > 0; i++) {
+    const idx = Math.floor(Math.random() * pool.length);
+    picked.push(pool.splice(idx, 1)[0]);
+  }
+
+  for (const up of picked) {
+    const div = document.createElement('div');
+    div.className = 'choice';
+    div.innerHTML = `<div class="name">${up.name}</div><div class="desc">${up.desc}</div>`;
+    div.addEventListener('click', () => {
+      up.apply(stats);
+      pendingLevelUps--;
+      AudioEngine.seLevelUp();
+      showLevelUpChoices();
+    });
+    choicesEl.appendChild(div);
+  }
+}
+
+/* ---------- 描画 ---------- */
+function drawImageCentered(img, x, y, size) {
+  ctx.drawImage(img, x - size / 2, y - size / 2, size, size);
+}
+
+function draw() {
+  ctx.fillStyle = '#0d0d12';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+  ctx.lineWidth = 1;
+  const g = 60;
+  for (let x = 0; x < W; x += g) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = 0; y < H; y += g) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+  for (const o of orbs) {
+    ctx.fillStyle = '#7fe57f';
+    ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2); ctx.fill();
+  }
+
+  for (const e of enemies) {
+    const img = images.enemies[e.type.key];
+    const size = e.r * 2.6;
+    if (img) {
+      drawImageCentered(img, e.x, e.y, size);
+      if (e.flash > 0) {
+        ctx.globalAlpha = 0.6;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    } else {
+      ctx.fillStyle = e.flash > 0 ? '#fff' : e.type.color;
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2); ctx.fill();
+    }
+    const w = e.r * 2;
+    const ratio = Math.max(0, e.hp / e.maxHp);
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(e.x - e.r, e.y - e.r - 9, w, 4);
+    ctx.fillStyle = '#4caf50';
+    ctx.fillRect(e.x - e.r, e.y - e.r - 9, w * ratio, 4);
+  }
+
+  for (const b of bullets) {
+    ctx.fillStyle = b.color || '#ffd54f';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+  }
+
+  const w = stats.weapons.orbit;
+  if (w.level > 0) {
+    for (let i = 0; i < w.count; i++) {
+      const a = w.angle + (Math.PI * 2 / w.count) * i;
+      const ox = player.x + Math.cos(a) * w.radius;
+      const oy = player.y + Math.sin(a) * w.radius;
+      ctx.fillStyle = '#b388ff';
+      ctx.beginPath(); ctx.arc(ox, oy, 12, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  for (const ef of effects) {
+    if (ef.type === 'laser') {
+      const alpha = ef.life / ef.maxLife;
+      ctx.strokeStyle = `rgba(255,80,180,${alpha})`;
+      ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(ef.x1, ef.y1); ctx.lineTo(ef.x2, ef.y2); ctx.stroke();
+      ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(ef.x1, ef.y1); ctx.lineTo(ef.x2, ef.y2); ctx.stroke();
+    }
+  }
+
+  for (const p of particles) {
+    ctx.globalAlpha = p.life / p.maxLife;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  if (player.invuln > 0) ctx.globalAlpha = 0.6;
+  if (images.player) {
+    drawImageCentered(images.player, player.x, player.y, player.r * 2.6);
+  } else {
+    ctx.fillStyle = '#4fc3f7';
+    ctx.beginPath(); ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = '#fff';
+  ctx.font = '14px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(`HP ${Math.ceil(player.hp)} / ${player.maxHp}`, 12, 22);
+  ctx.fillText(`Lv.${level}`, 12, 42);
+  ctx.fillText(`Time ${elapsed.toFixed(1)}s`, 12, 62);
+
+  const barW = W - 24;
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.fillRect(12, 74, barW, 8);
+  ctx.fillStyle = '#7fe57f';
+  ctx.fillRect(12, 74, barW * Math.min(1, exp / expNext), 8);
+
+  // バーチャルスティック可視化（タッチ中のみ）
+  if (stick.active) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(stick.baseX, stick.baseY, stick.maxDist, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(79,195,247,0.5)';
+    ctx.beginPath();
+    ctx.arc(stick.baseX, stick.baseY, 10, 0, Math.PI * 2);
+    ctx.fill();
+
+    const dx = stick.curX - stick.baseX;
+    const dy = stick.curY - stick.baseY;
+    const len = Math.hypot(dx, dy);
+    const ratio = Math.min(1, len / stick.maxDist);
+    const kx = stick.baseX + (len > 0 ? dx / len : 0) * stick.maxDist * ratio;
+    const ky = stick.baseY + (len > 0 ? dy / len : 0) * stick.maxDist * ratio;
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.beginPath();
+    ctx.arc(kx, ky, 16, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/* ---------- メインループ ---------- */
+function loop(now) {
+  const dt = Math.min(0.05, (now - lastTime) / 1000);
+  lastTime = now;
+  update(dt);
+  draw();
+  if (pendingLevelUps > 0 && !paused && !gameOver) {
+    showLevelUpChoices();
+  }
+  requestAnimationFrame(loop);
+}
+
+function ensureLoop() {
+  if (loopRunning) return;
+  loopRunning = true;
+  lastTime = performance.now();
+  requestAnimationFrame(loop);
+}
+
+/* ---------- オーバーレイ表示 ---------- */
+function showOverlay(title, msg, btnText) {
+  overlayTitle.textContent = title;
+  overlayMsg.textContent = msg;
+  overlayHelp.style.display = 'none';
+  startBtn.textContent = btnText || 'START';
+  overlayEl.classList.remove('hidden');
+}
+
+function showStartScreen() {
+  overlayTitle.textContent = 'Vansaba';
+  overlayMsg.textContent = 'タップ / クリックで開始';
+  overlayHelp.style.display = 'block';
+  startBtn.textContent = 'START';
+  overlayEl.classList.remove('hidden');
+}
+
+/* ---------- 起動 ---------- */
+(async () => {
+  await loadAssets();
+  resetGame();
+  draw();
+  showStartScreen();
+})();
+
+/* ---------- START 処理 ---------- */
+let starting = false;
+
+function handleStart(e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  if (starting) return;
+  starting = true;
+  try {
+    // AudioContext はユーザー操作の同期処理内で初期化
+    AudioEngine.init();
+    AudioEngine.resume();
+
+    overlayEl.classList.add('hidden');
+    resetGame();
+    AudioEngine.startBGM();
+    lastTime = performance.now();
+    ensureLoop();
+  } finally {
+    starting = false;
+  }
+}
+
+startBtn.addEventListener('pointerdown', handleStart);
+startBtn.addEventListener('touchend', handleStart, { passive: false });
+startBtn.addEventListener('click', handleStart);
