@@ -1,6 +1,8 @@
 /* =========================================================
-   Vansaba - 変更01 (完成版)
-   SVG敵 + Web Audio 合成 + スタート画面
+   Vansaba - 変更01 + 変更移動
+   - レベルアップ / 経験値 / 複数武器 / 複数敵種
+   - SVG敵 / Web Audio 合成 / スタート画面
+   - 入力：PCマウス追従 + スマホバーチャルスティック
    ========================================================= */
 
 const canvas = document.getElementById('game');
@@ -28,14 +30,87 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-/* ---------- 入力 ---------- */
-const input = { x: 0, y: 0, active: false };
-function setInput(cx, cy) { input.x = cx; input.y = cy; input.active = true; }
-canvas.addEventListener('touchstart', e => { e.preventDefault(); const t = e.touches[0]; setInput(t.clientX, t.clientY); }, { passive: false });
-canvas.addEventListener('touchmove',  e => { e.preventDefault(); const t = e.touches[0]; setInput(t.clientX, t.clientY); }, { passive: false });
-canvas.addEventListener('touchend',   e => { e.preventDefault(); input.active = false; }, { passive: false });
-canvas.addEventListener('mousemove',  e => setInput(e.clientX, e.clientY));
-canvas.addEventListener('mouseleave', () => input.active = false);
+/* =========================================================
+   入力（変更移動：ハイブリッド）
+   - マウス：カーソル位置へ追従
+   - タッチ：バーチャルスティック（指を置いた点が基点）
+   ========================================================= */
+
+// 移動ベクトル（正規化前。-1〜1程度に収まる）
+const move = { dx: 0, dy: 0, active: false };
+
+// タッチ用スティック状態
+const stick = {
+  active: false,
+  baseX: 0, baseY: 0,
+  curX: 0, curY: 0,
+  maxDist: 70,
+  deadZone: 8,
+};
+let lastPointerType = 'mouse';
+
+/* ---------- マウス ---------- */
+canvas.addEventListener('mousemove', e => {
+  if (lastPointerType === 'touch') return;
+  lastPointerType = 'mouse';
+  const dx = e.clientX - player.x;
+  const dy = e.clientY - player.y;
+  const len = Math.hypot(dx, dy);
+  if (len > 4) {
+    move.dx = dx / len;
+    move.dy = dy / len;
+    move.active = true;
+  } else {
+    move.active = false;
+  }
+});
+canvas.addEventListener('mouseleave', () => {
+  if (lastPointerType === 'mouse') move.active = false;
+});
+
+/* ---------- タッチ ---------- */
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  lastPointerType = 'touch';
+  const t = e.touches[0];
+  stick.active = true;
+  stick.baseX = t.clientX;
+  stick.baseY = t.clientY;
+  stick.curX = t.clientX;
+  stick.curY = t.clientY;
+  move.active = false;
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  lastPointerType = 'touch';
+  if (!stick.active) return;
+  const t = e.touches[0];
+  stick.curX = t.clientX;
+  stick.curY = t.clientY;
+
+  const dx = stick.curX - stick.baseX;
+  const dy = stick.curY - stick.baseY;
+  const len = Math.hypot(dx, dy);
+
+  if (len < stick.deadZone) {
+    move.active = false;
+    return;
+  }
+  const ratio = Math.min(1, len / stick.maxDist);
+  move.dx = (dx / len) * ratio;
+  move.dy = (dy / len) * ratio;
+  move.active = true;
+}, { passive: false });
+
+function endTouch(e) {
+  e.preventDefault();
+  lastPointerType = 'touch';
+  stick.active = false;
+  move.active = false;
+}
+canvas.addEventListener('touchend',    endTouch, { passive: false });
+canvas.addEventListener('touchcancel', endTouch, { passive: false });
 
 /* ---------- アセット ---------- */
 const ASSETS = {
@@ -267,14 +342,13 @@ function update(dt) {
   if (gameOver || paused) return;
   elapsed += dt;
 
-  if (input.active) {
-    const dx = input.x - player.x, dy = input.y - player.y;
-    const len = Math.hypot(dx, dy);
-    if (len > 4) {
-      const sp = player.speed * stats.moveSpeedMul;
-      player.x += (dx / len) * sp * dt;
-      player.y += (dy / len) * sp * dt;
-    }
+  // 移動（変更移動：move ベクトルに従う）
+  if (move.active) {
+    const sp = player.speed * stats.moveSpeedMul;
+    const len = Math.hypot(move.dx, move.dy) || 1;
+    const scale = Math.min(1, len);
+    player.x += (move.dx / len) * sp * scale * dt;
+    player.y += (move.dy / len) * sp * scale * dt;
   }
   player.x = Math.max(player.r, Math.min(W - player.r, player.x));
   player.y = Math.max(player.r, Math.min(H - player.r, player.y));
@@ -392,204 +466,4 @@ const UPGRADES = [
   { id: 'basic_rate',   name: '基本攻撃 連射', desc: '基本武器の間隔 -15%',         apply: s => s.weapons.basic.interval = Math.max(0.12, s.weapons.basic.interval * 0.85) },
   { id: 'basic_pierce', name: '基本攻撃 貫通', desc: '基本武器が1体貫通',           apply: s => s.weapons.basic.pierce += 1 },
   { id: 'spread',       name: '拡散ショット',   desc: '扇状に複数弾（Lv+1）',        apply: s => { s.weapons.spread.level++; s.weapons.spread.damage += 2; } },
-  { id: 'orbit',        name: '回転バリア',     desc: '周囲を回る弾（Lv+1）',        apply: s => { s.weapons.orbit.level++; s.weapons.orbit.count++; s.weapons.orbit.damage += 3; } },
-  { id: 'laser',        name: '貫通レーザー',   desc: '直線上に大ダメージ',          apply: s => { s.weapons.laser.level++; s.weapons.laser.damage += 15; s.weapons.laser.interval = Math.max(1.0, s.weapons.laser.interval - 0.2); } },
-  { id: 'speed',        name: '移動速度 UP',    desc: '移動速度 +12%',               apply: s => s.moveSpeedMul *= 1.12 },
-  { id: 'maxhp',        name: '最大HP UP',      desc: '最大HP +25 & 全回復',         apply: s => { player.maxHp += 25; player.hp = player.maxHp; } },
-  { id: 'regen',        name: 'HP自動回復',     desc: '毎秒 +1.5 HP',                apply: s => s.regen += 1.5 },
-  { id: 'pickup',       name: '取得範囲 UP',    desc: '経験値の吸引範囲 +40',        apply: s => s.pickupRange += 40 },
-  { id: 'expmul',       name: '経験値 UP',      desc: '獲得経験値 +25%',             apply: s => s.expMul *= 1.25 },
-];
-
-function showLevelUpChoices() {
-  if (pendingLevelUps <= 0) {
-    paused = false;
-    levelupEl.classList.add('hidden');
-    lastTime = performance.now();
-    return;
-  }
-  paused = true;
-  levelupEl.classList.remove('hidden');
-  choicesEl.innerHTML = '';
-
-  const pool = [...UPGRADES];
-  const picked = [];
-  for (let i = 0; i < 3 && pool.length > 0; i++) {
-    const idx = Math.floor(Math.random() * pool.length);
-    picked.push(pool.splice(idx, 1)[0]);
-  }
-
-  for (const up of picked) {
-    const div = document.createElement('div');
-    div.className = 'choice';
-    div.innerHTML = `<div class="name">${up.name}</div><div class="desc">${up.desc}</div>`;
-    div.addEventListener('click', () => {
-      up.apply(stats);
-      pendingLevelUps--;
-      AudioEngine.seLevelUp();
-      showLevelUpChoices();
-    });
-    choicesEl.appendChild(div);
-  }
-}
-
-/* ---------- 描画 ---------- */
-function drawImageCentered(img, x, y, size) {
-  ctx.drawImage(img, x - size / 2, y - size / 2, size, size);
-}
-
-function draw() {
-  ctx.fillStyle = '#0d0d12';
-  ctx.fillRect(0, 0, W, H);
-
-  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-  ctx.lineWidth = 1;
-  const g = 60;
-  for (let x = 0; x < W; x += g) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-  for (let y = 0; y < H; y += g) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
-
-  for (const o of orbs) {
-    ctx.fillStyle = '#7fe57f';
-    ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2); ctx.fill();
-  }
-
-  for (const e of enemies) {
-    const img = images.enemies[e.type.key];
-    const size = e.r * 2.6;
-    if (img) {
-      drawImageCentered(img, e.x, e.y, size);
-      if (e.flash > 0) {
-        ctx.globalAlpha = 0.6;
-        ctx.fillStyle = '#fff';
-        ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2); ctx.fill();
-        ctx.globalAlpha = 1;
-      }
-    } else {
-      ctx.fillStyle = e.flash > 0 ? '#fff' : e.type.color;
-      ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2); ctx.fill();
-    }
-    const w = e.r * 2;
-    const ratio = Math.max(0, e.hp / e.maxHp);
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(e.x - e.r, e.y - e.r - 9, w, 4);
-    ctx.fillStyle = '#4caf50';
-    ctx.fillRect(e.x - e.r, e.y - e.r - 9, w * ratio, 4);
-  }
-
-  for (const b of bullets) {
-    ctx.fillStyle = b.color || '#ffd54f';
-    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
-  }
-
-  const w = stats.weapons.orbit;
-  if (w.level > 0) {
-    for (let i = 0; i < w.count; i++) {
-      const a = w.angle + (Math.PI * 2 / w.count) * i;
-      const ox = player.x + Math.cos(a) * w.radius;
-      const oy = player.y + Math.sin(a) * w.radius;
-      ctx.fillStyle = '#b388ff';
-      ctx.beginPath(); ctx.arc(ox, oy, 12, 0, Math.PI * 2); ctx.fill();
-    }
-  }
-
-  for (const ef of effects) {
-    if (ef.type === 'laser') {
-      const alpha = ef.life / ef.maxLife;
-      ctx.strokeStyle = `rgba(255,80,180,${alpha})`;
-      ctx.lineWidth = 6;
-      ctx.beginPath(); ctx.moveTo(ef.x1, ef.y1); ctx.lineTo(ef.x2, ef.y2); ctx.stroke();
-      ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
-      ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(ef.x1, ef.y1); ctx.lineTo(ef.x2, ef.y2); ctx.stroke();
-    }
-  }
-
-  for (const p of particles) {
-    ctx.globalAlpha = p.life / p.maxLife;
-    ctx.fillStyle = p.color;
-    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-
-  if (player.invuln > 0) ctx.globalAlpha = 0.6;
-  if (images.player) {
-    drawImageCentered(images.player, player.x, player.y, player.r * 2.6);
-  } else {
-    ctx.fillStyle = '#4fc3f7';
-    ctx.beginPath(); ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2); ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-
-  ctx.fillStyle = '#fff';
-  ctx.font = '14px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText(`HP ${Math.ceil(player.hp)} / ${player.maxHp}`, 12, 22);
-  ctx.fillText(`Lv.${level}`, 12, 42);
-  ctx.fillText(`Time ${elapsed.toFixed(1)}s`, 12, 62);
-
-  const barW = W - 24;
-  ctx.fillStyle = 'rgba(255,255,255,0.15)';
-  ctx.fillRect(12, 74, barW, 8);
-  ctx.fillStyle = '#7fe57f';
-  ctx.fillRect(12, 74, barW * Math.min(1, exp / expNext), 8);
-}
-
-/* ---------- メインループ ---------- */
-function loop(now) {
-  const dt = Math.min(0.05, (now - lastTime) / 1000);
-  lastTime = now;
-  update(dt);
-  draw();
-  if (pendingLevelUps > 0 && !paused && !gameOver) {
-    showLevelUpChoices();
-  }
-  requestAnimationFrame(loop);
-}
-
-/* ---------- オーバーレイ表示 ---------- */
-function showOverlay(title, msg, btnText) {
-  overlayTitle.textContent = title;
-  overlayMsg.textContent = msg;
-  overlayHelp.style.display = 'none';
-  startBtn.textContent = btnText || 'START';
-  overlayEl.classList.remove('hidden');
-}
-
-function showStartScreen() {
-  overlayTitle.textContent = 'Vansaba';
-  overlayMsg.textContent = 'タップ / クリックで開始';
-  overlayHelp.style.display = 'block';
-  startBtn.textContent = 'START';
-  overlayEl.classList.remove('hidden');
-}
-
-/* ---------- 起動 ---------- */
-async function boot() {
-  await loadAssets();
-  resetGame();
-  draw(); // 初回描画
-  requestAnimationFrame(loop);
-}
-
-async function startGame() {
-  // AudioEngine はユーザー操作後に初期化（自動再生制限対策）
-  AudioEngine.init();
-  AudioEngine.resume();
-
-  overlayEl.classList.add('hidden');
-  resetGame();
-  AudioEngine.startBGM();
-  lastTime = performance.now();
-}
-
-startBtn.addEventListener('click', async (e) => {
-  e.preventDefault();
-  if (!started) {
-    started = true;
-    await boot();       // アセット読み込み + ループ開始（1回だけ）
-  }
-  await startGame();    // 毎回リセット＆BGM開始
-});
-
-// 初期表示：スタート画面
-showStartScreen();
+  { id: 'orbit',        name: '回転バリア',     desc: '周囲を回る弾（Lv+1）',        apply: s => { s.weapons.orbit.level++; s.weapons.orbit.count++; s.weapons.orbit.damage
