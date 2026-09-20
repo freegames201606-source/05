@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<title>Vansaba - 変更01</title>
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- レベルアップ選択UI -->
+  <div id="levelup" class="hidden">
+    <h2>LEVEL UP!</h2>
+    <p>強化を選んでください</p>
+    <div id="choices"></div>
+  </div>
+
+  <!-- スタート / ゲームオーバー画面 -->
+  <div id="overlay">
+    <h1 id="overlay-title">Vansaba</h1>
+    <p id="overlay-msg">タップ / クリックで開始</p>
+    <div id="overlay-help">
+      <p>・マウス / タッチで移動</p>
+      <p>・攻撃は自動</p>
+      <p>・レベルアップで3択強化</p>
+    </div>
+    <button id="startBtn">START</button>
+  </div>
+
+  <script src="./audio.js"></script>
+  <script src="./main.js"></script>
+</body>
+</html>

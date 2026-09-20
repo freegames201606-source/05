@@ -1,0 +1,70 @@
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; background: #0d0d12; overflow: hidden;
+  font-family: -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN", sans-serif;
+  color: #fff;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+canvas { display: block; touch-action: none; }
+
+/* レベルアップ */
+#levelup {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.78);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 14px; z-index: 20;
+  padding: 20px;
+}
+#levelup.hidden { display: none; }
+#levelup h2 { margin: 0; font-size: 26px; color: #ffd54f; letter-spacing: 2px; }
+#levelup p { margin: 0; opacity: 0.8; font-size: 14px; }
+#choices {
+  display: flex; flex-direction: column; gap: 10px;
+  width: min(420px, 90vw);
+}
+.choice {
+  background: #1e1e2a;
+  border: 2px solid #4fc3f7;
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: transform 0.1s, background 0.1s;
+}
+.choice:hover, .choice:active { background: #2a2a3a; transform: scale(1.02); }
+.choice .name { font-weight: bold; font-size: 16px; }
+.choice .desc { font-size: 12px; opacity: 0.8; margin-top: 4px; }
+
+/* スタート / ゲームオーバー */
+#overlay {
+  position: fixed; inset: 0;
+  background: radial-gradient(circle at 50% 30%, #1b1b30 0%, #0d0d12 80%);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 14px; z-index: 30;
+  padding: 24px;
+  text-align: center;
+}
+#overlay.hidden { display: none; }
+#overlay-title {
+  margin: 0; font-size: 44px; letter-spacing: 3px;
+  color: #4fc3f7;
+  text-shadow: 0 0 20px rgba(79,195,247,0.6);
+}
+#overlay-msg { margin: 0; opacity: 0.85; font-size: 14px; }
+#overlay-help {
+  margin: 8px 0 4px;
+  font-size: 13px; opacity: 0.7; line-height: 1.6;
+}
+#overlay-help p { margin: 0; }
+#startBtn {
+  padding: 14px 40px; font-size: 18px; font-weight: bold;
+  background: #4fc3f7; color: #0d0d12;
+  border: none; border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 0 24px rgba(79,195,247,0.5);
+  transition: transform 0.1s;
+}
+#startBtn:active { transform: scale(0.96); }
