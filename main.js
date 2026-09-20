@@ -1,10 +1,5 @@
 /* =========================================================
    Vansaba - 一段階 + D + E + F + 難易度/速度（完全版）
-   D: ヒットストップ / 画面シェイク / ダメージ数字
-   E: セーフエリア対応
-   F: ハイスコア保存
-   難易度: EASY / NORMAL / HARD
-   速度: 0.7x / 1.0x 切替
    ========================================================= */
 
 const canvas = document.getElementById('game');
@@ -164,18 +159,15 @@ async function loadAssets() {
 
 /* ---------- セーブ ---------- */
 const SAVE_KEY = 'vansaba_best_time_v1';
-
 function loadBest() {
   try {
     const v = localStorage.getItem(SAVE_KEY);
     return v ? parseFloat(v) || 0 : 0;
   } catch (e) { return 0; }
 }
-
 function saveBest(t) {
   try { localStorage.setItem(SAVE_KEY, String(t)); } catch (e) {}
 }
-
 let bestTime = loadBest();
 function refreshHiscoreDisplay() {
   if (hiscoreValue) hiscoreValue.textContent = bestTime.toFixed(1);
@@ -187,7 +179,6 @@ const DIFFICULTIES = {
   normal: { label: 'NORMAL', enemyHpMul: 1.0, enemySpeedMul: 1.0,  spawnMul: 1.0,  damageMul: 1.0, expMul: 1.0 },
   hard:   { label: 'HARD',   enemyHpMul: 1.5, enemySpeedMul: 1.15, spawnMul: 0.75, damageMul: 1.4, expMul: 0.85 },
 };
-
 let difficultyKey = 'normal';
 
 function setupDifficultyUI() {
@@ -681,11 +672,13 @@ function draw() {
   for (let y = 0; y < H; y += g) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
 
   if (player && stats) {
+    // オーブ
     for (const o of orbs) {
       ctx.fillStyle = '#7fe57f';
       ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2); ctx.fill();
     }
 
+    // 敵
     for (const e of enemies) {
       const img = images.enemies[e.type.key];
       const size = e.r * 2.6;
@@ -709,11 +702,13 @@ function draw() {
       ctx.fillRect(e.x - e.r, e.y - e.r - 9, w * ratio, 4);
     }
 
+    // 弾
     for (const b of bullets) {
       ctx.fillStyle = b.color || '#ffd54f';
       ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
     }
 
+    // 回転バリア
     const w = stats.weapons.orbit;
     if (w.level > 0) {
       for (let i = 0; i < w.count; i++) {
@@ -725,6 +720,7 @@ function draw() {
       }
     }
 
+    // レーザー
     for (const ef of effects) {
       if (ef.type === 'laser') {
         const alpha = ef.life / ef.maxLife;
@@ -737,6 +733,7 @@ function draw() {
       }
     }
 
+    // パーティクル
     for (const p of particles) {
       ctx.globalAlpha = p.life / p.maxLife;
       ctx.fillStyle = p.color;
@@ -744,8 +741,28 @@ function draw() {
     }
     ctx.globalAlpha = 1;
 
+    // プレイヤー
     if (player.invuln > 0) ctx.globalAlpha = 0.6;
     if (images.player) {
       drawImageCentered(images.player, player.x, player.y, player.r * 2.6);
     } else {
-      ctx.fillStyle = '#4fc
+      ctx.fillStyle = '#4fc3f7';
+      ctx.beginPath(); ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // ダメージ数字
+    for (const dn of damageNumbers) {
+      const alpha = dn.life / dn.maxLife;
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = dn.color;
+      ctx.font = 'bold 15px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(String(dn.value), dn.x, dn.y);
+    }
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'left';
+
+    // バーチャルスティック
+    if (stick.active) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)
