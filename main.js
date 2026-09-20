@@ -1,5 +1,5 @@
 /* =========================================================
-   Vansaba - 一段階 + D + E + F + 難易度/速度
+   Vansaba - 一段階 + D + E + F + 難易度/速度（完全版）
    D: ヒットストップ / 画面シェイク / ダメージ数字
    E: セーフエリア対応
    F: ハイスコア保存
@@ -191,6 +191,7 @@ const DIFFICULTIES = {
 let difficultyKey = 'normal';
 
 function setupDifficultyUI() {
+  if (!difficultyEl) return;
   const buttons = difficultyEl.querySelectorAll('.diff-btn');
   buttons.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -213,6 +214,7 @@ function updateSpeedBtn() {
 }
 
 function setupSpeedUI() {
+  if (!speedBtn) return;
   speedBtn.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -598,4 +600,152 @@ function update(dt) {
       bestTime = elapsed;
       saveBest(bestTime);
       refreshHiscoreDisplay();
-      showOverlay('GAME OVER', `自己ベスト更新！ ${elapsed.toFixed(1)}秒 / Lv.${level}`,
+      showOverlay('GAME OVER', `自己ベスト更新！ ${elapsed.toFixed(1)}秒 / Lv.${level}`, 'RETRY');
+    } else {
+      showOverlay('GAME OVER', `生存 ${elapsed.toFixed(1)}秒 / Lv.${level}`, 'RETRY');
+    }
+    stopLoop();
+  }
+}
+
+/* ---------- レベルアップ ---------- */
+const UPGRADES = [
+  { id: 'basic_dmg',    name: '基本攻撃 強化', desc: '基本武器のダメージ +5',       apply: s => s.weapons.basic.damage += 5 },
+  { id: 'basic_rate',   name: '基本攻撃 連射', desc: '基本武器の間隔 -15%',         apply: s => s.weapons.basic.interval = Math.max(0.12, s.weapons.basic.interval * 0.85) },
+  { id: 'basic_pierce', name: '基本攻撃 貫通', desc: '基本武器が1体貫通',           apply: s => s.weapons.basic.pierce += 1 },
+  { id: 'spread',       name: '拡散ショット',   desc: '扇状に複数弾（Lv+1）',        apply: s => { s.weapons.spread.level++; s.weapons.spread.damage += 2; } },
+  { id: 'orbit',        name: '回転バリア',     desc: '周囲を回る弾（Lv+1）',        apply: s => { s.weapons.orbit.level++; s.weapons.orbit.count++; s.weapons.orbit.damage += 3; } },
+  { id: 'laser',        name: '貫通レーザー',   desc: '直線上に大ダメージ',          apply: s => { s.weapons.laser.level++; s.weapons.laser.damage += 15; s.weapons.laser.interval = Math.max(1.0, s.weapons.laser.interval - 0.2); } },
+  { id: 'speed',        name: '移動速度 UP',    desc: '移動速度 +12%',               apply: s => s.moveSpeedMul *= 1.12 },
+  { id: 'maxhp',        name: '最大HP UP',      desc: '最大HP +25 & 全回復',         apply: s => { player.maxHp += 25; player.hp = player.maxHp; } },
+  { id: 'regen',        name: 'HP自動回復',     desc: '毎秒 +1.5 HP',                apply: s => s.regen += 1.5 },
+  { id: 'pickup',       name: '取得範囲 UP',    desc: '経験値の吸引範囲 +40',        apply: s => s.pickupRange += 40 },
+  { id: 'expmul',       name: '経験値 UP',      desc: '獲得経験値 +25%',             apply: s => s.expMul *= 1.25 },
+];
+
+function showLevelUpChoices() {
+  if (pendingLevelUps <= 0) {
+    paused = false;
+    levelupEl.classList.add('hidden');
+    lastTime = performance.now();
+    return;
+  }
+  paused = true;
+  levelupEl.classList.remove('hidden');
+  choicesEl.innerHTML = '';
+
+  const pool = [...UPGRADES];
+  const picked = [];
+  for (let i = 0; i < 3 && pool.length > 0; i++) {
+    const idx = Math.floor(Math.random() * pool.length);
+    picked.push(pool.splice(idx, 1)[0]);
+  }
+
+  for (const up of picked) {
+    const div = document.createElement('div');
+    div.className = 'choice';
+    div.innerHTML = `<div class="name">${up.name}</div><div class="desc">${up.desc}</div>`;
+    div.addEventListener('click', () => {
+      up.apply(stats);
+      pendingLevelUps--;
+      AudioEngine.seLevelUp();
+      addShake(6, 0.15);
+      showLevelUpChoices();
+    });
+    choicesEl.appendChild(div);
+  }
+}
+
+/* ---------- 描画 ---------- */
+function drawImageCentered(img, x, y, size) {
+  ctx.drawImage(img, x - size / 2, y - size / 2, size, size);
+}
+
+function draw() {
+  let ox = 0, oy = 0;
+  if (shake.time > 0) {
+    ox = (Math.random() - 0.5) * 2 * shake.mag;
+    oy = (Math.random() - 0.5) * 2 * shake.mag;
+  }
+
+  ctx.save();
+  ctx.translate(ox, oy);
+
+  ctx.fillStyle = '#0d0d12';
+  ctx.fillRect(-50, -50, W + 100, H + 100);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+  ctx.lineWidth = 1;
+  const g = 60;
+  for (let x = 0; x < W; x += g) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = 0; y < H; y += g) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+  if (player && stats) {
+    for (const o of orbs) {
+      ctx.fillStyle = '#7fe57f';
+      ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2); ctx.fill();
+    }
+
+    for (const e of enemies) {
+      const img = images.enemies[e.type.key];
+      const size = e.r * 2.6;
+      if (img) {
+        drawImageCentered(img, e.x, e.y, size);
+        if (e.flash > 0) {
+          ctx.globalAlpha = 0.6;
+          ctx.fillStyle = '#fff';
+          ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2); ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+      } else {
+        ctx.fillStyle = e.flash > 0 ? '#fff' : e.type.color;
+        ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2); ctx.fill();
+      }
+      const w = e.r * 2;
+      const ratio = Math.max(0, e.hp / e.maxHp);
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(e.x - e.r, e.y - e.r - 9, w, 4);
+      ctx.fillStyle = '#4caf50';
+      ctx.fillRect(e.x - e.r, e.y - e.r - 9, w * ratio, 4);
+    }
+
+    for (const b of bullets) {
+      ctx.fillStyle = b.color || '#ffd54f';
+      ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+    }
+
+    const w = stats.weapons.orbit;
+    if (w.level > 0) {
+      for (let i = 0; i < w.count; i++) {
+        const a = w.angle + (Math.PI * 2 / w.count) * i;
+        const ox2 = player.x + Math.cos(a) * w.radius;
+        const oy2 = player.y + Math.sin(a) * w.radius;
+        ctx.fillStyle = '#b388ff';
+        ctx.beginPath(); ctx.arc(ox2, oy2, 12, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    for (const ef of effects) {
+      if (ef.type === 'laser') {
+        const alpha = ef.life / ef.maxLife;
+        ctx.strokeStyle = `rgba(255,80,180,${alpha})`;
+        ctx.lineWidth = 6;
+        ctx.beginPath(); ctx.moveTo(ef.x1, ef.y1); ctx.lineTo(ef.x2, ef.y2); ctx.stroke();
+        ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(ef.x1, ef.y1); ctx.lineTo(ef.x2, ef.y2); ctx.stroke();
+      }
+    }
+
+    for (const p of particles) {
+      ctx.globalAlpha = p.life / p.maxLife;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    if (player.invuln > 0) ctx.globalAlpha = 0.6;
+    if (images.player) {
+      drawImageCentered(images.player, player.x, player.y, player.r * 2.6);
+    } else {
+      ctx.fillStyle = '#4fc
