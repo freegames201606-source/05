@@ -1,9 +1,9 @@
 /* =========================================================
-   Vansaba - 変更01 + 変更移動 + スマホSTART修正
+   Vansaba - 変更01 + 変更移動 + START修正
    - レベルアップ / 経験値 / 複数武器 / 複数敵種
    - SVG敵 / Web Audio 合成 / スタート画面
    - 入力：PCマウス追従 + スマホバーチャルスティック
-   - スマホのSTARTタップ対応（pointerdown/touchend + AudioContext同期init）
+   - START：フラグ廃止、毎回 beginGame() で確実に起動
    ========================================================= */
 
 const canvas = document.getElementById('game');
@@ -57,6 +57,7 @@ function overlayVisible() {
 canvas.addEventListener('mousemove', e => {
   if (lastPointerType === 'touch') return;
   if (overlayVisible()) return;
+  if (!player) return;
   lastPointerType = 'mouse';
   const dx = e.clientX - player.x;
   const dy = e.clientY - player.y;
@@ -75,7 +76,7 @@ canvas.addEventListener('mouseleave', () => {
 
 /* ---------- タッチ ---------- */
 canvas.addEventListener('touchstart', e => {
-  if (overlayVisible()) return; // オーバーレイ表示中はcanvasタッチ無効
+  if (overlayVisible()) return;
   e.preventDefault();
   lastPointerType = 'touch';
   const t = e.touches[0];
@@ -157,14 +158,23 @@ const ENEMY_TYPES = [
   { key: 'rabbit', hp: 10, speed: 170, r: 12, dmg: 14, exp: 6,  color: '#ffd0e0' },
 ];
 
-let player, enemies, bullets, orbs, effects, particles;
-let spawnTimer, elapsed, gameOver, paused, level;
-let exp, expNext;
-let stats;
-let lastTime;
+let player = null;
+let enemies = [];
+let bullets = [];
+let orbs = [];
+let effects = [];
+let particles = [];
+let spawnTimer = 0;
+let elapsed = 0;
+let gameOver = false;
+let paused = false;
+let level = 1;
+let exp = 0;
+let expNext = 5;
+let stats = null;
+let lastTime = 0;
 let pendingLevelUps = 0;
-let started = false;
-let loopRunning = false;
+let gameLoopId = null;
 
 function resetGame() {
   player = {
@@ -465,6 +475,7 @@ function update(dt) {
     AudioEngine.stopBGM();
     AudioEngine.seGameOver();
     showOverlay('GAME OVER', `生存 ${elapsed.toFixed(1)}秒 / Lv.${level}`, 'RETRY');
+    stopLoop();
   }
 }
 
@@ -529,6 +540,8 @@ function draw() {
   const g = 60;
   for (let x = 0; x < W; x += g) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
   for (let y = 0; y < H; y += g) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+  if (!player || !stats) return;
 
   for (const o of orbs) {
     ctx.fillStyle = '#7fe57f';
@@ -615,7 +628,7 @@ function draw() {
   ctx.fillStyle = '#7fe57f';
   ctx.fillRect(12, 74, barW * Math.min(1, exp / expNext), 8);
 
-  // バーチャルスティック可視化（タッチ中のみ）
+  // バーチャルスティック可視化
   if (stick.active) {
     ctx.strokeStyle = 'rgba(255,255,255,0.35)';
     ctx.lineWidth = 2;
@@ -641,7 +654,7 @@ function draw() {
   }
 }
 
-/* ---------- メインループ ---------- */
+/* ---------- ループ制御 ---------- */
 function loop(now) {
   const dt = Math.min(0.05, (now - lastTime) / 1000);
   lastTime = now;
@@ -650,14 +663,36 @@ function loop(now) {
   if (pendingLevelUps > 0 && !paused && !gameOver) {
     showLevelUpChoices();
   }
-  requestAnimationFrame(loop);
+  gameLoopId = requestAnimationFrame(loop);
 }
 
-function ensureLoop() {
-  if (loopRunning) return;
-  loopRunning = true;
+function stopLoop() {
+  if (gameLoopId !== null) {
+    cancelAnimationFrame(gameLoopId);
+    gameLoopId = null;
+  }
+}
+
+function beginGame() {
+  stopLoop();
+
+  // AudioContext はユーザー操作の同期処理内で初期化
+  try {
+    AudioEngine.init();
+    AudioEngine.resume();
+  } catch (err) {
+    console.warn('Audio init failed:', err);
+  }
+
+  overlayEl.classList.add('hidden');
+  levelupEl.classList.add('hidden');
+
+  resetGame();
+
+  try { AudioEngine.startBGM(); } catch (err) { console.warn(err); }
+
   lastTime = performance.now();
-  requestAnimationFrame(loop);
+  gameLoopId = requestAnimationFrame(loop);
 }
 
 /* ---------- オーバーレイ表示 ---------- */
@@ -677,36 +712,22 @@ function showStartScreen() {
   overlayEl.classList.remove('hidden');
 }
 
-/* ---------- 起動 ---------- */
+/* ---------- START ボタン ---------- */
+function onStartButton(ev) {
+  if (ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+  }
+  beginGame();
+}
+
+startBtn.addEventListener('touchend', onStartButton, { passive: false });
+startBtn.addEventListener('click',    onStartButton);
+
+/* ---------- 初期化 ---------- */
 (async () => {
   await loadAssets();
   resetGame();
   draw();
   showStartScreen();
 })();
-
-/* ---------- START 処理 ---------- */
-let starting = false;
-
-function handleStart(e) {
-  if (e) { e.preventDefault(); e.stopPropagation(); }
-  if (starting) return;
-  starting = true;
-  try {
-    // AudioContext はユーザー操作の同期処理内で初期化
-    AudioEngine.init();
-    AudioEngine.resume();
-
-    overlayEl.classList.add('hidden');
-    resetGame();
-    AudioEngine.startBGM();
-    lastTime = performance.now();
-    ensureLoop();
-  } finally {
-    starting = false;
-  }
-}
-
-startBtn.addEventListener('pointerdown', handleStart);
-startBtn.addEventListener('touchend', handleStart, { passive: false });
-startBtn.addEventListener('click', handleStart);
