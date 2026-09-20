@@ -8,20 +8,14 @@
 </head>
 <body>
   <canvas id="game"></canvas>
-
-  <!-- 速度切替ボタン（プレイ中のみ表示） -->
   <div id="speed-bar" class="hidden">
     <button id="speedBtn" class="speed-btn">1.0x</button>
   </div>
-
-  <!-- レベルアップ選択UI -->
   <div id="levelup" class="hidden">
     <h2>LEVEL UP!</h2>
     <p>強化を選んでください</p>
     <div id="choices"></div>
   </div>
-
-  <!-- スタート / ゲームオーバー画面 -->
   <div id="overlay">
     <h1 id="overlay-title">Vansaba</h1>
     <p id="overlay-msg">タップ / クリックで開始</p>
@@ -33,8 +27,8 @@
     </div>
     <button id="startBtn">START</button>
   </div>
-
   <script src="./audio.js"></script>
-  <script src="./main.js"></script>
+  <script src="./game-core.js"></script>
+  <script src="./game-draw.js"></script>
 </body>
 </html>
