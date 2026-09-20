@@ -9,21 +9,47 @@
 <body>
   <canvas id="game"></canvas>
 
+  <!-- ゲーム中のボタン（ポーズ・音） -->
+  <div id="top-bar" class="hidden">
+    <button id="pauseBtn" class="top-btn">Ⅱ</button>
+    <button id="soundBtn" class="top-btn">♪</button>
+  </div>
+
+  <!-- ポーズ画面 -->
+  <div id="pause" class="hidden">
+    <h2>PAUSE</h2>
+    <button id="resumeBtn">再開</button>
+    <button id="quitBtn">タイトルへ</button>
+  </div>
+
+  <!-- レベルアップ -->
   <div id="levelup" class="hidden">
     <h2>LEVEL UP!</h2>
     <p>強化を選んでください</p>
     <div id="choices"></div>
   </div>
 
+  <!-- スタート / ゲームオーバー -->
   <div id="overlay">
     <h1 id="overlay-title">はしちゃん<br>サバイバー</h1>
     <p id="overlay-msg">タップ / クリックで開始</p>
+
+    <div id="diff-block">
+      <p class="diff-label">難易度</p>
+      <div id="difficulty">
+        <button class="diff-btn" data-diff="easy">EASY</button>
+        <button class="diff-btn selected" data-diff="normal">NORMAL</button>
+        <button class="diff-btn" data-diff="hard">HARD</button>
+      </div>
+    </div>
+
     <div id="overlay-help">
       <p>・PC：マウス位置へ移動</p>
       <p>・スマホ：画面をドラッグしてスティック操作</p>
       <p>・攻撃は自動</p>
       <p>・レベルアップで3択強化</p>
     </div>
+    <p id="hiscore-line">ハイスコア：<span id="hiscore-value">0.0</span>秒</p>
     <button id="startBtn">START</button>
   </div>
 
