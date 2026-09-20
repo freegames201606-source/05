@@ -103,7 +103,7 @@ const ASSETS = {
   enemies: {
     dog: './assets/enemies/dog.svg',
     cat: './assets/enemies/cat.svg',
-    bear: './assets/enemies/bear.svg',
+    panda: './assets/enemies/panda.svg',
     rabbit: './assets/enemies/rabbit.svg',
   },
 };
@@ -121,7 +121,7 @@ async function loadAssets() {
   for (const k in ASSETS.enemies) images.enemies[k] = await loadImage(ASSETS.enemies[k]);
 }
 
-/* ---- セーブ（F: ハイスコア） ---- */
+/* ---- セーブ ---- */
 const SAVE_KEY = 'hashichan_best_v1';
 function loadBest() {
   try {
@@ -181,11 +181,11 @@ function vibrate(ms) {
   }
 }
 
-/* ---- ゲーム状態 ---- */
+/* ---- 敵タイプ ---- */
 const ENEMY_TYPES = [
   { key: 'dog',    hp: 9,  speed: 85,  r: 15, dmg: 20, exp: 4,  color: '#e0a060' },
   { key: 'cat',    hp: 6,  speed: 130, r: 13, dmg: 16, exp: 5,  color: '#c0c0c0' },
-  { key: 'bear',   hp: 30, speed: 55,  r: 21, dmg: 40, exp: 14, color: '#8b5a2b' },
+  { key: 'panda',  hp: 30, speed: 55,  r: 21, dmg: 40, exp: 14, color: '#222222' },
   { key: 'rabbit', hp: 5,  speed: 170, r: 12, dmg: 14, exp: 6,  color: '#ffd0e0' },
 ];
 
@@ -196,7 +196,6 @@ let gameOver = false, paused = false, pauseRequested = false;
 let level = 1, exp = 0, expNext = 5;
 let stats = null, lastTime = 0, pendingLevelUps = 0, gameLoopId = null;
 
-/* 演出用 */
 let hitStop = 0;
 let shake = { time: 0, mag: 0 };
 let redFlash = 0;
@@ -633,7 +632,6 @@ function draw() {
     }
     ctx.globalAlpha = 1;
 
-    /* ダメージ数字 */
     ctx.font = 'bold 15px sans-serif';
     ctx.textAlign = 'center';
     for (const dn of damageNumbers) {
@@ -645,7 +643,6 @@ function draw() {
     ctx.textAlign = 'left';
   }
 
-  /* スティック */
   if (stick.active) {
     ctx.strokeStyle = 'rgba(255,255,255,0.35)';
     ctx.lineWidth = 2;
@@ -665,25 +662,21 @@ function draw() {
 
   ctx.restore();
 
-  /* 赤フラッシュ */
   if (redFlash > 0) {
     ctx.fillStyle = 'rgba(255,0,0,' + (redFlash * 0.6) + ')';
     ctx.fillRect(0, 0, W, H);
   }
 
-  /* HUD（セーフエリア考慮） */
   if (player && stats) {
     const safe = getSafeArea();
     const hx = 12 + safe.left;
     const hy = 22 + safe.top;
-
     ctx.fillStyle = '#fff';
     ctx.font = '14px sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText('HP ' + Math.ceil(player.hp) + ' / ' + player.maxHp, hx, hy);
     ctx.fillText('Lv.' + level, hx, hy + 20);
     ctx.fillText('Time ' + elapsed.toFixed(1) + 's', hx, hy + 40);
-
     const barX = 12 + safe.left;
     const barW = W - 24 - safe.left - safe.right;
     const barY = hy + 52;
@@ -698,7 +691,6 @@ function loop(now) {
   const rawDt = Math.min(0.05, (now - lastTime) / 1000);
   lastTime = now;
 
-  /* ポーズ要求 */
   if (pauseRequested && !gameOver) {
     pauseRequested = false;
     doPause();
@@ -775,7 +767,6 @@ function doResume() {
   lastTime = performance.now();
 }
 
-/* ポーズ・音ボタン */
 pauseBtn.addEventListener('click', e => {
   e.preventDefault(); e.stopPropagation();
   pauseRequested = true;
@@ -791,7 +782,6 @@ quitBtn.addEventListener('click', e => {
   showStartScreen();
 });
 
-/* START */
 function onStartButton(ev) {
   if (ev) { ev.preventDefault(); ev.stopPropagation(); }
   beginGame();
