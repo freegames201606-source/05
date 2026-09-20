@@ -1,6 +1,5 @@
 /* =========================================================
    audio.js - Web Audio API で効果音 & BGM を合成
-   外部音声ファイル不要
    ========================================================= */
 
 const AudioEngine = (() => {
@@ -32,9 +31,6 @@ const AudioEngine = (() => {
     if (ctx && ctx.state === 'suspended') ctx.resume();
   }
 
-  /* ---------- 効果音 ---------- */
-
-  // 射撃：短い矩形波
   function seShoot() {
     if (!ctx) return;
     const t = ctx.currentTime;
@@ -49,11 +45,9 @@ const AudioEngine = (() => {
     o.start(t); o.stop(t + 0.09);
   }
 
-  // 被弾：ノイズ＋低音
   function seHit() {
     if (!ctx) return;
     const t = ctx.currentTime;
-    // ノイズ
     const buf = ctx.createBuffer(1, ctx.sampleRate * 0.15, ctx.sampleRate);
     const d = buf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
@@ -68,7 +62,6 @@ const AudioEngine = (() => {
     src.connect(f); f.connect(g); g.connect(seGain);
     src.start(t);
 
-    // 低音
     const o = ctx.createOscillator();
     const g2 = ctx.createGain();
     o.type = 'sawtooth';
@@ -80,11 +73,10 @@ const AudioEngine = (() => {
     o.start(t); o.stop(t + 0.16);
   }
 
-  // レベルアップ：上昇アルペジオ
   function seLevelUp() {
     if (!ctx) return;
     const t = ctx.currentTime;
-    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+    const notes = [523.25, 659.25, 783.99, 1046.5];
     notes.forEach((freq, i) => {
       const o = ctx.createOscillator();
       const g = ctx.createGain();
@@ -99,7 +91,6 @@ const AudioEngine = (() => {
     });
   }
 
-  // ゲームオーバー：下降
   function seGameOver() {
     if (!ctx) return;
     const t = ctx.currentTime;
@@ -118,10 +109,6 @@ const AudioEngine = (() => {
     });
   }
 
-  /* ---------- BGM（チップチューン風ループ） ---------- */
-
-  // 4小節 × 8分音符 = 32ステップ
-  // メロディ（簡易）：周波数 Hz。0 は休符。
   const MELODY = [
     659.25, 0, 783.99, 0, 880, 0, 783.99, 0,
     659.25, 0, 587.33, 0, 523.25, 0, 0, 0,
@@ -134,7 +121,7 @@ const AudioEngine = (() => {
     174.61, 0, 0, 0, 174.61, 0, 0, 0,
     196.00, 0, 0, 0, 196.00, 0, 0, 0,
   ];
-  const STEP_MS = 200; // 8分音符 = 200ms → BPM150相当
+  const STEP_MS = 200;
 
   function tickBGM() {
     if (!ctx) return;
