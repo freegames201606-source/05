@@ -109,16 +109,16 @@ function updateSpeedBtn() {
 }
 speedBtn.addEventListener('click', e => {
   e.preventDefault(); e.stopPropagation();
-  gameSpeed = (gameSpeed === 1.0) ? 0.7 : 1.0;
+  gameSpeed = (gameSpeed === 1.0) ? 0.5 : 1.0;
   updateSpeedBtn();
 });
 updateSpeedBtn();
 
 const ENEMY_TYPES = [
-  { key: 'dog',    hp: 18, speed: 85,  r: 15, dmg: 20, exp: 4,  color: '#e0a060' },
-  { key: 'cat',    hp: 12, speed: 130, r: 13, dmg: 16, exp: 5,  color: '#c0c0c0' },
-  { key: 'bear',   hp: 60, speed: 55,  r: 21, dmg: 40, exp: 14, color: '#8b5a2b' },
-  { key: 'rabbit', hp: 10, speed: 170, r: 12, dmg: 14, exp: 6,  color: '#ffd0e0' },
+  { key: 'dog',    hp: 9,  speed: 85,  r: 15, dmg: 20, exp: 4,  color: '#e0a060' },
+  { key: 'cat',    hp: 6,  speed: 130, r: 13, dmg: 16, exp: 5,  color: '#c0c0c0' },
+  { key: 'bear',   hp: 30, speed: 55,  r: 21, dmg: 40, exp: 14, color: '#8b5a2b' },
+  { key: 'rabbit', hp: 5,  speed: 170, r: 12, dmg: 14, exp: 6,  color: '#ffd0e0' },
 ];
 
 let player = null;

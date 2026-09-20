@@ -142,7 +142,7 @@ function showOverlay(title, msg, btnText) {
 }
 
 function showStartScreen() {
-  overlayTitle.textContent = 'Vansaba';
+  overlayTitle.innerHTML = 'はしちゃん<br>サバイバー';
   overlayMsg.textContent = 'タップ / クリックで開始';
   overlayHelp.style.display = 'block';
   startBtn.textContent = 'START';
