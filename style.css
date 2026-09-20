@@ -18,6 +18,31 @@ html, body {
 }
 canvas { display: block; touch-action: none; }
 
+/* 速度切替バー（プレイ中・右上） */
+#speed-bar {
+  position: fixed;
+  top: calc(8px + var(--sat));
+  right: calc(8px + var(--sar));
+  z-index: 15;
+  display: flex;
+  gap: 6px;
+}
+#speed-bar.hidden { display: none; }
+.speed-btn {
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #fff;
+  background: rgba(30,30,42,0.85);
+  border: 2px solid #4fc3f7;
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.1s, background 0.1s;
+}
+.speed-btn:active { transform: scale(0.95); background: #2a2a3a; }
+.speed-btn.slow { border-color: #ffd54f; color: #ffd54f; }
+
 /* レベルアップ */
 #levelup {
   position: fixed; inset: 0;
@@ -78,10 +103,42 @@ canvas { display: block; touch-action: none; }
 }
 #overlay-msg { margin: 0; opacity: 0.85; font-size: 14px; }
 #overlay-help {
-  margin: 8px 0 4px;
+  margin: 4px 0;
   font-size: 13px; opacity: 0.7; line-height: 1.6;
 }
 #overlay-help p { margin: 0; }
+
+/* 難易度選択 */
+#difficulty-block {
+  margin: 4px 0;
+  display: flex; flex-direction: column; gap: 6px;
+  align-items: center;
+}
+.diff-label {
+  margin: 0; font-size: 13px; opacity: 0.8; letter-spacing: 2px;
+}
+#difficulty {
+  display: flex; gap: 8px;
+}
+.diff-btn {
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #aaa;
+  background: #1e1e2a;
+  border: 2px solid #333;
+  border-radius: 10px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.1s, background 0.1s, color 0.1s, border-color 0.1s;
+}
+.diff-btn:active { transform: scale(0.96); }
+.diff-btn.selected {
+  color: #fff;
+  background: #263a4a;
+  border-color: #4fc3f7;
+  box-shadow: 0 0 12px rgba(79,195,247,0.4);
+}
 
 #hiscore-line {
   margin: 6px 0 4px;

@@ -3,11 +3,16 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<title>Vansaba - 一段階 + D + E + F</title>
+<title>Vansaba - 一段階 + D + E + F + 難易度/速度</title>
 <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
   <canvas id="game"></canvas>
+
+  <!-- 速度切替ボタン（プレイ中のみ表示） -->
+  <div id="speed-bar" class="hidden">
+    <button id="speedBtn" class="speed-btn">1.0x</button>
+  </div>
 
   <!-- レベルアップ選択UI -->
   <div id="levelup" class="hidden">
@@ -20,6 +25,17 @@
   <div id="overlay">
     <h1 id="overlay-title">Vansaba</h1>
     <p id="overlay-msg">タップ / クリックで開始</p>
+
+    <!-- 難易度選択 -->
+    <div id="difficulty-block">
+      <p class="diff-label">難易度</p>
+      <div id="difficulty">
+        <button class="diff-btn" data-diff="easy">EASY</button>
+        <button class="diff-btn selected" data-diff="normal">NORMAL</button>
+        <button class="diff-btn" data-diff="hard">HARD</button>
+      </div>
+    </div>
+
     <div id="overlay-help">
       <p>・PC：マウス位置へ移動</p>
       <p>・スマホ：画面をドラッグしてスティック操作</p>

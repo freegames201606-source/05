@@ -1,8 +1,10 @@
 /* =========================================================
-   Vansaba - 一段階 + D（演出強化）+ E（スマホ最適化）+ F（セーブ）
-   - D: ヒットストップ / 画面シェイク / ダメージ数字
-   - E: セーフエリア対応 / スマホUI調整
-   - F: ハイスコアを localStorage に保存
+   Vansaba - 一段階 + D + E + F + 難易度/速度
+   D: ヒットストップ / 画面シェイク / ダメージ数字
+   E: セーフエリア対応
+   F: ハイスコア保存
+   難易度: EASY / NORMAL / HARD
+   速度: 0.7x / 1.0x 切替
    ========================================================= */
 
 const canvas = document.getElementById('game');
@@ -13,9 +15,11 @@ const overlayEl = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayMsg = document.getElementById('overlay-msg');
 const overlayHelp = document.getElementById('overlay-help');
-const hiscoreLine = document.getElementById('hiscore-line');
 const hiscoreValue = document.getElementById('hiscore-value');
 const startBtn = document.getElementById('startBtn');
+const difficultyEl = document.getElementById('difficulty');
+const speedBar = document.getElementById('speed-bar');
+const speedBtn = document.getElementById('speedBtn');
 
 /* ---------- 画面サイズ ---------- */
 let W = 0, H = 0;
@@ -32,7 +36,7 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-/* ---------- セーフエリア（E） ---------- */
+/* ---------- セーフエリア ---------- */
 function getSafeArea() {
   const cs = getComputedStyle(document.documentElement);
   const num = v => parseFloat(v) || 0;
@@ -45,7 +49,7 @@ function getSafeArea() {
 }
 
 /* =========================================================
-   入力（変更移動：ハイブリッド）
+   入力
    ========================================================= */
 const move = { dx: 0, dy: 0, active: false };
 
@@ -158,29 +162,66 @@ async function loadAssets() {
   }
 }
 
-/* ---------- セーブ（F） ---------- */
+/* ---------- セーブ ---------- */
 const SAVE_KEY = 'vansaba_best_time_v1';
 
 function loadBest() {
   try {
     const v = localStorage.getItem(SAVE_KEY);
     return v ? parseFloat(v) || 0 : 0;
-  } catch (e) {
-    return 0;
-  }
+  } catch (e) { return 0; }
 }
 
 function saveBest(t) {
-  try {
-    localStorage.setItem(SAVE_KEY, String(t));
-  } catch (e) {}
+  try { localStorage.setItem(SAVE_KEY, String(t)); } catch (e) {}
 }
 
 let bestTime = loadBest();
-
 function refreshHiscoreDisplay() {
   if (hiscoreValue) hiscoreValue.textContent = bestTime.toFixed(1);
 }
+
+/* ---------- 難易度 ---------- */
+const DIFFICULTIES = {
+  easy:   { label: 'EASY',   enemyHpMul: 0.7, enemySpeedMul: 0.85, spawnMul: 1.25, damageMul: 0.7, expMul: 1.3 },
+  normal: { label: 'NORMAL', enemyHpMul: 1.0, enemySpeedMul: 1.0,  spawnMul: 1.0,  damageMul: 1.0, expMul: 1.0 },
+  hard:   { label: 'HARD',   enemyHpMul: 1.5, enemySpeedMul: 1.15, spawnMul: 0.75, damageMul: 1.4, expMul: 0.85 },
+};
+
+let difficultyKey = 'normal';
+
+function setupDifficultyUI() {
+  const buttons = difficultyEl.querySelectorAll('.diff-btn');
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      buttons.forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      difficultyKey = btn.dataset.diff;
+    });
+  });
+}
+setupDifficultyUI();
+
+/* ---------- ゲーム速度 ---------- */
+let gameSpeed = 1.0;
+
+function updateSpeedBtn() {
+  if (!speedBtn) return;
+  speedBtn.textContent = gameSpeed.toFixed(1) + 'x';
+  if (gameSpeed < 1) speedBtn.classList.add('slow');
+  else speedBtn.classList.remove('slow');
+}
+
+function setupSpeedUI() {
+  speedBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    gameSpeed = (gameSpeed === 1.0) ? 0.7 : 1.0;
+    updateSpeedBtn();
+  });
+  updateSpeedBtn();
+}
+setupSpeedUI();
 
 /* ---------- ゲーム状態 ---------- */
 const ENEMY_TYPES = [
@@ -196,7 +237,7 @@ let bullets = [];
 let orbs = [];
 let effects = [];
 let particles = [];
-let damageNumbers = [];   // D: ダメージ数字
+let damageNumbers = [];
 let spawnTimer = 0;
 let elapsed = 0;
 let gameOver = false;
@@ -209,35 +250,27 @@ let lastTime = 0;
 let pendingLevelUps = 0;
 let gameLoopId = null;
 
-/* D: 演出用 */
 let hitStop = 0;
 let shake = { time: 0, mag: 0 };
 
-/* ヒットストップを追加（既存値より大きい場合のみ上書き） */
-function addHitStop(t) {
-  if (t > hitStop) hitStop = t;
-}
-
-/* 画面シェイクを追加 */
+function addHitStop(t) { if (t > hitStop) hitStop = t; }
 function addShake(mag, dur) {
   shake.mag = Math.max(shake.mag, mag);
   shake.time = Math.max(shake.time, dur);
 }
-
-/* ダメージ数字を追加 */
 function addDamageNumber(x, y, value, color) {
   damageNumbers.push({
     x, y,
     vx: (Math.random() - 0.5) * 40,
     vy: -70,
-    life: 0.7,
-    maxLife: 0.7,
+    life: 0.7, maxLife: 0.7,
     value: Math.round(value),
     color: color || '#fff',
   });
 }
 
 function resetGame() {
+  const diff = DIFFICULTIES[difficultyKey] || DIFFICULTIES.normal;
   player = {
     x: W / 2, y: H / 2, r: 18,
     speed: 240,
@@ -271,6 +304,7 @@ function resetGame() {
     moveSpeedMul: 1,
     regen: 0,
     expMul: 1,
+    diff,
   };
   lastTime = performance.now();
 }
@@ -292,6 +326,7 @@ function pickEnemyType() {
 }
 
 function spawnEnemy() {
+  const diff = stats.diff;
   const type = pickEnemyType();
   const edge = Math.floor(Math.random() * 4);
   let x, y;
@@ -300,14 +335,14 @@ function spawnEnemy() {
   else if (edge === 2) { x = Math.random() * W; y = H + 30; }
   else { x = -30; y = Math.random() * H; }
 
-  const hpScale = 1 + elapsed * 0.06;
+  const hpScale = (1 + elapsed * 0.06) * diff.enemyHpMul;
   const hp = type.hp * hpScale;
   enemies.push({
     type, x, y,
     r: type.r,
     hp, maxHp: hp,
-    speed: type.speed * (1 + elapsed * 0.002),
-    dmg: type.dmg,
+    speed: type.speed * (1 + elapsed * 0.002) * diff.enemySpeedMul,
+    dmg: type.dmg * diff.damageMul,
     flash: 0,
   });
 }
@@ -386,8 +421,7 @@ function updateOrbit(dt) {
     for (const e of enemies) {
       const d = (ox - e.x) ** 2 + (oy - e.y) ** 2;
       if (d < (14 + e.r) ** 2) {
-        const dmg = w.damage * dt * 4;
-        e.hp -= dmg;
+        e.hp -= w.damage * dt * 4;
         e.flash = 0.1;
       }
     }
@@ -422,10 +456,7 @@ function fireLaser(dt) {
   }
   effects.push({ type: 'laser', x1: player.x, y1: player.y, x2, y2, life: 0.18, maxLife: 0.18 });
   AudioEngine.seShoot();
-  if (hitAny) {
-    addHitStop(0.06);
-    addShake(8, 0.18);
-  }
+  if (hitAny) { addHitStop(0.06); addShake(8, 0.18); }
 }
 
 /* ---------- 更新 ---------- */
@@ -474,7 +505,7 @@ function update(dt) {
 
   spawnTimer -= dt;
   if (spawnTimer <= 0) {
-    const interval = Math.max(0.18, 1.1 - elapsed * 0.012);
+    const interval = Math.max(0.18, (1.1 - elapsed * 0.012) * stats.diff.spawnMul);
     spawnTimer = interval;
     spawnEnemy();
     if (elapsed > 45 && Math.random() < 0.4) spawnEnemy();
@@ -527,7 +558,7 @@ function update(dt) {
   for (const o of orbs) {
     const d = (player.x - o.x) ** 2 + (player.y - o.y) ** 2;
     if (d < (player.r + o.r) ** 2) {
-      exp += o.exp * stats.expMul;
+      exp += o.exp * stats.expMul * stats.diff.expMul;
       while (exp >= expNext) {
         exp -= expNext;
         level++;
@@ -567,77 +598,4 @@ function update(dt) {
       bestTime = elapsed;
       saveBest(bestTime);
       refreshHiscoreDisplay();
-      showOverlay('GAME OVER', `自己ベスト更新！ ${elapsed.toFixed(1)}秒 / Lv.${level}`, 'RETRY');
-    } else {
-      showOverlay('GAME OVER', `生存 ${elapsed.toFixed(1)}秒 / Lv.${level}`, 'RETRY');
-    }
-    stopLoop();
-  }
-}
-
-/* ---------- レベルアップ ---------- */
-const UPGRADES = [
-  { id: 'basic_dmg',    name: '基本攻撃 強化', desc: '基本武器のダメージ +5',       apply: s => s.weapons.basic.damage += 5 },
-  { id: 'basic_rate',   name: '基本攻撃 連射', desc: '基本武器の間隔 -15%',         apply: s => s.weapons.basic.interval = Math.max(0.12, s.weapons.basic.interval * 0.85) },
-  { id: 'basic_pierce', name: '基本攻撃 貫通', desc: '基本武器が1体貫通',           apply: s => s.weapons.basic.pierce += 1 },
-  { id: 'spread',       name: '拡散ショット',   desc: '扇状に複数弾（Lv+1）',        apply: s => { s.weapons.spread.level++; s.weapons.spread.damage += 2; } },
-  { id: 'orbit',        name: '回転バリア',     desc: '周囲を回る弾（Lv+1）',        apply: s => { s.weapons.orbit.level++; s.weapons.orbit.count++; s.weapons.orbit.damage += 3; } },
-  { id: 'laser',        name: '貫通レーザー',   desc: '直線上に大ダメージ',          apply: s => { s.weapons.laser.level++; s.weapons.laser.damage += 15; s.weapons.laser.interval = Math.max(1.0, s.weapons.laser.interval - 0.2); } },
-  { id: 'speed',        name: '移動速度 UP',    desc: '移動速度 +12%',               apply: s => s.moveSpeedMul *= 1.12 },
-  { id: 'maxhp',        name: '最大HP UP',      desc: '最大HP +25 & 全回復',         apply: s => { player.maxHp += 25; player.hp = player.maxHp; } },
-  { id: 'regen',        name: 'HP自動回復',     desc: '毎秒 +1.5 HP',                apply: s => s.regen += 1.5 },
-  { id: 'pickup',       name: '取得範囲 UP',    desc: '経験値の吸引範囲 +40',        apply: s => s.pickupRange += 40 },
-  { id: 'expmul',       name: '経験値 UP',      desc: '獲得経験値 +25%',             apply: s => s.expMul *= 1.25 },
-];
-
-function showLevelUpChoices() {
-  if (pendingLevelUps <= 0) {
-    paused = false;
-    levelupEl.classList.add('hidden');
-    lastTime = performance.now();
-    return;
-  }
-  paused = true;
-  levelupEl.classList.remove('hidden');
-  choicesEl.innerHTML = '';
-
-  const pool = [...UPGRADES];
-  const picked = [];
-  for (let i = 0; i < 3 && pool.length > 0; i++) {
-    const idx = Math.floor(Math.random() * pool.length);
-    picked.push(pool.splice(idx, 1)[0]);
-  }
-
-  for (const up of picked) {
-    const div = document.createElement('div');
-    div.className = 'choice';
-    div.innerHTML = `<div class="name">${up.name}</div><div class="desc">${up.desc}</div>`;
-    div.addEventListener('click', () => {
-      up.apply(stats);
-      pendingLevelUps--;
-      AudioEngine.seLevelUp();
-      addShake(6, 0.15);
-      showLevelUpChoices();
-    });
-    choicesEl.appendChild(div);
-  }
-}
-
-/* ---------- 描画 ---------- */
-function drawImageCentered(img, x, y, size) {
-  ctx.drawImage(img, x - size / 2, y - size / 2, size, size);
-}
-
-function draw() {
-  // 画面シェイクのオフセット計算
-  let ox = 0, oy = 0;
-  if (shake.time > 0) {
-    const k = shake.time;
-    ox = (Math.random() - 0.5) * 2 * shake.mag;
-    oy = (Math.random() - 0.5) * 2 * shake.mag;
-  }
-
-  ctx.save();
-  ctx.translate(ox, oy);
-
-  ctx.fillStyle = '#
+      showOverlay('GAME OVER', `自己ベスト更新！ ${elapsed.toFixed(1)}秒 / Lv.${level}`,
