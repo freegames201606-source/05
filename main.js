@@ -590,9 +590,9 @@ function update(dt) {
       bestTime = elapsed;
       saveBest(bestTime);
       refreshHiscoreDisplay();
-      showOverlay('GAME OVER', `自己ベスト更新！ ${elapsed.toFixed(1)}秒 / Lv.${level}`, 'RETRY');
+      showOverlay('GAME OVER', '自己ベスト更新！ ' + elapsed.toFixed(1) + '秒 / Lv.' + level, 'RETRY');
     } else {
-      showOverlay('GAME OVER', `生存 ${elapsed.toFixed(1)}秒 / Lv.${level}`, 'RETRY');
+      showOverlay('GAME OVER', '生存 ' + elapsed.toFixed(1) + '秒 / Lv.' + level, 'RETRY');
     }
     stopLoop();
   }
@@ -634,7 +634,7 @@ function showLevelUpChoices() {
   for (const up of picked) {
     const div = document.createElement('div');
     div.className = 'choice';
-    div.innerHTML = `<div class="name">${up.name}</div><div class="desc">${up.desc}</div>`;
+    div.innerHTML = '<div class="name">' + up.name + '</div><div class="desc">' + up.desc + '</div>';
     div.addEventListener('click', () => {
       up.apply(stats);
       pendingLevelUps--;
@@ -671,13 +671,11 @@ function draw() {
   for (let y = 0; y < H; y += g) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
 
   if (player && stats) {
-    // オーブ
     for (const o of orbs) {
       ctx.fillStyle = '#7fe57f';
       ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, Math.PI * 2); ctx.fill();
     }
 
-    // 敵
     for (const e of enemies) {
       const img = images.enemies[e.type.key];
       const size = e.r * 2.6;
@@ -701,13 +699,11 @@ function draw() {
       ctx.fillRect(e.x - e.r, e.y - e.r - 9, w * ratio, 4);
     }
 
-    // 弾
     for (const b of bullets) {
       ctx.fillStyle = b.color || '#ffd54f';
       ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
     }
 
-    // 回転バリア
     const w = stats.weapons.orbit;
     if (w.level > 0) {
       for (let i = 0; i < w.count; i++) {
@@ -719,20 +715,18 @@ function draw() {
       }
     }
 
-    // レーザー
     for (const ef of effects) {
       if (ef.type === 'laser') {
         const alpha = ef.life / ef.maxLife;
-        ctx.strokeStyle = `rgba(255,80,180,${alpha})`;
+        ctx.strokeStyle = 'rgba(255,80,180,' + alpha + ')';
         ctx.lineWidth = 6;
         ctx.beginPath(); ctx.moveTo(ef.x1, ef.y1); ctx.lineTo(ef.x2, ef.y2); ctx.stroke();
-        ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+        ctx.strokeStyle = 'rgba(255,255,255,' + alpha + ')';
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(ef.x1, ef.y1); ctx.lineTo(ef.x2, ef.y2); ctx.stroke();
       }
     }
 
-    // パーティクル
     for (const p of particles) {
       ctx.globalAlpha = p.life / p.maxLife;
       ctx.fillStyle = p.color;
@@ -740,7 +734,6 @@ function draw() {
     }
     ctx.globalAlpha = 1;
 
-    // プレイヤー
     if (player.invuln > 0) ctx.globalAlpha = 0.6;
     if (images.player) {
       drawImageCentered(images.player, player.x, player.y, player.r * 2.6);
@@ -750,7 +743,6 @@ function draw() {
     }
     ctx.globalAlpha = 1;
 
-    // ダメージ数字
     ctx.font = 'bold 15px sans-serif';
     ctx.textAlign = 'center';
     for (const dn of damageNumbers) {
@@ -763,7 +755,6 @@ function draw() {
     ctx.textAlign = 'left';
   }
 
-  // バーチャルスティック可視化
   if (stick.active) {
     ctx.strokeStyle = 'rgba(255,255,255,0.35)';
     ctx.lineWidth = 2;
@@ -776,147 +767,4 @@ function draw() {
     ctx.arc(stick.baseX, stick.baseY, 10, 0, Math.PI * 2);
     ctx.fill();
 
-    const dx = stick.curX - stick.baseX;
-    const dy = stick.curY - stick.baseY;
-    const len = Math.hypot(dx, dy);
-    const ratio = Math.min(1, len / stick.maxDist);
-    const kx = stick.baseX + (len > 0 ? dx / len : 0) * stick.maxDist * ratio;
-    const ky = stick.baseY + (len > 0 ? dy / len : 0) * stick.maxDist * ratio;
-    ctx.fillStyle = 'rgba(255,255,255,0.7)';
-    ctx.beginPath();
-    ctx.arc(kx, ky, 16, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  ctx.restore();
-
-  // HUD（セーフエリア考慮）
-  if (player && stats) {
-    const safe = getSafeArea();
-    const hx = 12 + safe.left;
-    const hy = 22 + safe.top;
-
-    ctx.fillStyle = '#fff';
-    ctx.font = '14px sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(`HP ${Math.ceil(player.hp)} / ${player.maxHp}`, hx, hy);
-    ctx.fillText(`Lv.${level}`, hx, hy + 20);
-    ctx.fillText(`Time ${elapsed.toFixed(1)}s`, hx, hy + 40);
-
-    // 経験値バー
-    const barX = 12 + safe.left;
-    const barW = W - 24 - safe.left - safe.right;
-    const barY = hy + 52;
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.fillRect(barX, barY, barW, 8);
-    ctx.fillStyle = '#7fe57f';
-    ctx.fillRect(barX, barY, barW * Math.min(1, exp / expNext), 8);
-  }
-}
-
-/* ---------- ループ制御 ---------- */
-function loop(now) {
-  const rawDt = Math.min(0.05, (now - lastTime) / 1000);
-  lastTime = now;
-
-  // ヒットストップ処理
-  let dt = rawDt * gameSpeed;
-  if (hitStop > 0) {
-    hitStop -= rawDt;
-    dt = 0;
-  }
-
-  // シェイク時間の減少（実時間ベース）
-  if (shake.time > 0) {
-    shake.time -= rawDt;
-    if (shake.time <= 0) {
-      shake.time = 0;
-      shake.mag = 0;
-    }
-  }
-
-  update(dt);
-  draw();
-
-  if (pendingLevelUps > 0 && !paused && !gameOver) {
-    showLevelUpChoices();
-  }
-  gameLoopId = requestAnimationFrame(loop);
-}
-
-function stopLoop() {
-  if (gameLoopId !== null) {
-    cancelAnimationFrame(gameLoopId);
-    gameLoopId = null;
-  }
-}
-
-function beginGame() {
-  stopLoop();
-
-  // AudioContext はユーザー操作の同期処理内で初期化
-  try {
-    AudioEngine.init();
-    AudioEngine.resume();
-  } catch (err) {
-    console.warn('Audio init failed:', err);
-  }
-
-  overlayEl.classList.add('hidden');
-  levelupEl.classList.add('hidden');
-  speedBar.classList.remove('hidden');
-
-  resetGame();
-
-  try { AudioEngine.startBGM(); } catch (err) { console.warn(err); }
-
-  lastTime = performance.now();
-  gameLoopId = requestAnimationFrame(loop);
-}
-
-/* ---------- オーバーレイ表示 ---------- */
-function showOverlay(title, msg, btnText) {
-  overlayTitle.textContent = title;
-  overlayMsg.textContent = msg;
-  overlayHelp.style.display = 'none';
-  if (difficultyEl && difficultyEl.parentElement) {
-    difficultyEl.parentElement.style.display = 'none';
-  }
-  startBtn.textContent = btnText || 'START';
-  speedBar.classList.add('hidden');
-  overlayEl.classList.remove('hidden');
-  refreshHiscoreDisplay();
-}
-
-function showStartScreen() {
-  overlayTitle.textContent = 'Vansaba';
-  overlayMsg.textContent = 'タップ / クリックで開始';
-  overlayHelp.style.display = 'block';
-  if (difficultyEl && difficultyEl.parentElement) {
-    difficultyEl.parentElement.style.display = 'flex';
-  }
-  startBtn.textContent = 'START';
-  speedBar.classList.add('hidden');
-  overlayEl.classList.remove('hidden');
-  refreshHiscoreDisplay();
-}
-
-/* ---------- START ボタン ---------- */
-function onStartButton(ev) {
-  if (ev) {
-    ev.preventDefault();
-    ev.stopPropagation();
-  }
-  beginGame();
-}
-
-startBtn.addEventListener('touchend', onStartButton, { passive: false });
-startBtn.addEventListener('click',    onStartButton);
-
-/* ---------- 初期化 ---------- */
-(async () => {
-  await loadAssets();
-  resetGame();
-  draw();
-  showStartScreen();
-})();
+    const dx
