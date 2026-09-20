@@ -37,8 +37,7 @@ canvas.addEventListener('mousemove', e => {
   if (overlayVisible()) return;
   if (!player) return;
   lastPointerType = 'mouse';
-  const dx = e.clientX - player.x;
-  const dy = e.clientY - player.y;
+  const dx = e.clientX - player.x, dy = e.clientY - player.y;
   const len = Math.hypot(dx, dy);
   if (len > 4) { move.dx = dx / len; move.dy = dy / len; move.active = true; }
   else move.active = false;
@@ -46,44 +45,34 @@ canvas.addEventListener('mousemove', e => {
 canvas.addEventListener('mouseleave', () => {
   if (lastPointerType === 'mouse') move.active = false;
 });
-
 canvas.addEventListener('touchstart', e => {
   if (overlayVisible()) return;
   e.preventDefault();
   lastPointerType = 'touch';
   const t = e.touches[0];
-  stick.active = true;
-  stick.baseX = t.clientX;
-  stick.baseY = t.clientY;
-  stick.curX = t.clientX;
-  stick.curY = t.clientY;
+  stick.active = true; stick.baseX = t.clientX; stick.baseY = t.clientY;
+  stick.curX = t.clientX; stick.curY = t.clientY;
   move.active = false;
 }, { passive: false });
-
 canvas.addEventListener('touchmove', e => {
   if (overlayVisible()) return;
   e.preventDefault();
   lastPointerType = 'touch';
   if (!stick.active) return;
   const t = e.touches[0];
-  stick.curX = t.clientX;
-  stick.curY = t.clientY;
-  const dx = stick.curX - stick.baseX;
-  const dy = stick.curY - stick.baseY;
+  stick.curX = t.clientX; stick.curY = t.clientY;
+  const dx = stick.curX - stick.baseX, dy = stick.curY - stick.baseY;
   const len = Math.hypot(dx, dy);
   if (len < stick.deadZone) { move.active = false; return; }
   const ratio = Math.min(1, len / stick.maxDist);
-  move.dx = (dx / len) * ratio;
-  move.dy = (dy / len) * ratio;
+  move.dx = (dx / len) * ratio; move.dy = (dy / len) * ratio;
   move.active = true;
 }, { passive: false });
-
 function endTouch(e) {
   if (overlayVisible()) return;
   e.preventDefault();
   lastPointerType = 'touch';
-  stick.active = false;
-  move.active = false;
+  stick.active = false; move.active = false;
 }
 canvas.addEventListener('touchend', endTouch, { passive: false });
 canvas.addEventListener('touchcancel', endTouch, { passive: false });
@@ -98,7 +87,6 @@ const ASSETS = {
   },
 };
 const images = { player: null, enemies: {} };
-
 function loadImage(src) {
   return new Promise(resolve => {
     const img = new Image();
@@ -109,9 +97,7 @@ function loadImage(src) {
 }
 async function loadAssets() {
   images.player = await loadImage(ASSETS.player);
-  for (const [k, src] of Object.entries(ASSETS.enemies)) {
-    images.enemies[k] = await loadImage(src);
-  }
+  for (const k in ASSETS.enemies) images.enemies[k] = await loadImage(ASSETS.enemies[k]);
 }
 
 let gameSpeed = 1.0;
@@ -122,8 +108,7 @@ function updateSpeedBtn() {
   else speedBtn.classList.remove('slow');
 }
 speedBtn.addEventListener('click', e => {
-  e.preventDefault();
-  e.stopPropagation();
+  e.preventDefault(); e.stopPropagation();
   gameSpeed = (gameSpeed === 1.0) ? 0.7 : 1.0;
   updateSpeedBtn();
 });
@@ -137,22 +122,11 @@ const ENEMY_TYPES = [
 ];
 
 let player = null;
-let enemies = [];
-let bullets = [];
-let orbs = [];
-let effects = [];
-let particles = [];
-let spawnTimer = 0;
-let elapsed = 0;
-let gameOver = false;
-let paused = false;
-let level = 1;
-let exp = 0;
-let expNext = 5;
-let stats = null;
-let lastTime = 0;
-let pendingLevelUps = 0;
-let gameLoopId = null;
+let enemies = [], bullets = [], orbs = [], effects = [], particles = [];
+let spawnTimer = 0, elapsed = 0;
+let gameOver = false, paused = false;
+let level = 1, exp = 0, expNext = 5;
+let stats = null, lastTime = 0, pendingLevelUps = 0, gameLoopId = null;
 
 function resetGame() {
   player = { x: W / 2, y: H / 2, r: 18, speed: 240, hp: 100, maxHp: 100, invuln: 0 };
@@ -179,7 +153,8 @@ function pickEnemyType() {
     { type: ENEMY_TYPES[3], w: t > 30 ? 3 : 0 },
     { type: ENEMY_TYPES[2], w: t > 60 ? 2 : 0 },
   ];
-  const total = pool.reduce((s, p) => s + p.w, 0);
+  let total = 0;
+  for (const p of pool) total += p.w;
   if (total <= 0) return ENEMY_TYPES[0];
   let r = Math.random() * total;
   for (const p of pool) { r -= p.w; if (r <= 0) return p.type; }
@@ -194,8 +169,7 @@ function spawnEnemy() {
   else if (edge === 1) { x = W + 30; y = Math.random() * H; }
   else if (edge === 2) { x = Math.random() * W; y = H + 30; }
   else { x = -30; y = Math.random() * H; }
-  const hpScale = 1 + elapsed * 0.06;
-  const hp = type.hp * hpScale;
+  const hp = type.hp * (1 + elapsed * 0.06);
   enemies.push({ type, x, y, r: type.r, hp, maxHp: hp, speed: type.speed * (1 + elapsed * 0.002), dmg: type.dmg, flash: 0 });
 }
 
@@ -272,16 +246,14 @@ function fireLaser(dt) {
   if (!target) return;
   w.timer = w.interval;
   const a = Math.atan2(target.y - player.y, target.x - player.x);
-  const len = 1200;
-  const x2 = player.x + Math.cos(a) * len;
-  const y2 = player.y + Math.sin(a) * len;
+  const x2 = player.x + Math.cos(a) * 1200;
+  const y2 = player.y + Math.sin(a) * 1200;
   for (const e of enemies) {
     const dx = x2 - player.x, dy = y2 - player.y;
     const t = ((e.x - player.x) * dx + (e.y - player.y) * dy) / (dx * dx + dy * dy);
     if (t < 0 || t > 1) continue;
     const px = player.x + dx * t, py = player.y + dy * t;
-    const d = Math.hypot(e.x - px, e.y - py);
-    if (d < e.r + w.width) { e.hp -= w.damage; e.flash = 0.15; }
+    if (Math.hypot(e.x - px, e.y - py) < e.r + w.width) { e.hp -= w.damage; e.flash = 0.15; }
   }
   effects.push({ type: 'laser', x1: player.x, y1: player.y, x2, y2, life: 0.18, maxLife: 0.18 });
   AudioEngine.seShoot();
@@ -304,21 +276,16 @@ function update(dt) {
   if (player.invuln > 0) player.invuln -= dt;
   if (stats.regen > 0) player.hp = Math.min(player.maxHp, player.hp + stats.regen * dt);
 
-  fireBasic(dt);
-  fireSpread(dt);
-  fireLaser(dt);
-  updateOrbit(dt);
+  fireBasic(dt); fireSpread(dt); fireLaser(dt); updateOrbit(dt);
 
   for (const b of bullets) { b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt; }
   for (const b of bullets) {
     if (b.life <= 0) continue;
     for (const e of enemies) {
-      if (e.hp <= 0) continue;
-      if (b.hitSet.has(e)) continue;
+      if (e.hp <= 0 || b.hitSet.has(e)) continue;
       const d = (b.x - e.x) ** 2 + (b.y - e.y) ** 2;
       if (d < (b.r + e.r) ** 2) {
-        e.hp -= b.damage;
-        e.flash = 0.1;
+        e.hp -= b.damage; e.flash = 0.1;
         b.hitSet.add(e);
         spawnParticles(b.x, b.y, '#fff', 3);
         if (b.pierce > 0) b.pierce--;
@@ -330,8 +297,7 @@ function update(dt) {
 
   spawnTimer -= dt;
   if (spawnTimer <= 0) {
-    const interval = Math.max(0.18, 1.1 - elapsed * 0.012);
-    spawnTimer = interval;
+    spawnTimer = Math.max(0.18, 1.1 - elapsed * 0.012);
     spawnEnemy();
     if (elapsed > 45 && Math.random() < 0.4) spawnEnemy();
   }
@@ -347,8 +313,7 @@ function update(dt) {
   for (const e of enemies) {
     const d = (player.x - e.x) ** 2 + (player.y - e.y) ** 2;
     if (d < (player.r + e.r) ** 2 && player.invuln <= 0) {
-      player.hp -= e.dmg;
-      player.invuln = 0.4;
+      player.hp -= e.dmg; player.invuln = 0.4;
       AudioEngine.seHit();
       spawnParticles(player.x, player.y, '#f66', 8);
     }
@@ -378,8 +343,7 @@ function update(dt) {
     if (d < (player.r + o.r) ** 2) {
       exp += o.exp * stats.expMul;
       while (exp >= expNext) {
-        exp -= expNext;
-        level++;
+        exp -= expNext; level++;
         expNext = Math.floor(expNext * 1.35 + 3);
         pendingLevelUps++;
       }
@@ -389,19 +353,15 @@ function update(dt) {
 
   for (const p of particles) {
     p.x += p.vx * dt; p.y += p.vy * dt;
-    p.vx *= 0.92; p.vy *= 0.92;
-    p.life -= dt;
+    p.vx *= 0.92; p.vy *= 0.92; p.life -= dt;
   }
   particles = particles.filter(p => p.life > 0);
-
   for (const ef of effects) ef.life -= dt;
   effects = effects.filter(ef => ef.life > 0);
 
   if (player.hp <= 0) {
-    player.hp = 0;
-    gameOver = true;
-    AudioEngine.stopBGM();
-    AudioEngine.seGameOver();
+    player.hp = 0; gameOver = true;
+    AudioEngine.stopBGM(); AudioEngine.seGameOver();
     showOverlay('GAME OVER', '生存 ' + elapsed.toFixed(1) + '秒 / Lv.' + level, 'RETRY');
     stopLoop();
   }
@@ -431,7 +391,7 @@ function showLevelUpChoices() {
   paused = true;
   levelupEl.classList.remove('hidden');
   choicesEl.innerHTML = '';
-  const pool = [...UPGRADES];
+  const pool = UPGRADES.slice();
   const picked = [];
   for (let i = 0; i < 3 && pool.length > 0; i++) {
     const idx = Math.floor(Math.random() * pool.length);
@@ -475,8 +435,7 @@ function draw() {
       if (img) {
         drawImageCentered(img, e.x, e.y, size);
         if (e.flash > 0) {
-          ctx.globalAlpha = 0.6;
-          ctx.fillStyle = '#fff';
+          ctx.globalAlpha = 0.6; ctx.fillStyle = '#fff';
           ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2); ctx.fill();
           ctx.globalAlpha = 1;
         }
@@ -550,45 +509,33 @@ function draw() {
     ctx.arc(stick.baseX, stick.baseY, stick.maxDist, 0, Math.PI * 2);
     ctx.stroke();
     ctx.fillStyle = 'rgba(79,195,247,0.5)';
-    ctx.beginPath();
-    ctx.arc(stick.baseX, stick.baseY, 10, 0, Math.PI * 2);
-    ctx.fill();
-    const dx = stick.curX - stick.baseX;
-    const dy = stick.curY - stick.baseY;
+    ctx.beginPath(); ctx.arc(stick.baseX, stick.baseY, 10, 0, Math.PI * 2); ctx.fill();
+    const dx = stick.curX - stick.baseX, dy = stick.curY - stick.baseY;
     const len = Math.hypot(dx, dy);
     const ratio = Math.min(1, len / stick.maxDist);
     const kx = stick.baseX + (len > 0 ? dx / len : 0) * stick.maxDist * ratio;
     const ky = stick.baseY + (len > 0 ? dy / len : 0) * stick.maxDist * ratio;
     ctx.fillStyle = 'rgba(255,255,255,0.7)';
-    ctx.beginPath();
-    ctx.arc(kx, ky, 16, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(kx, ky, 16, 0, Math.PI * 2); ctx.fill();
   }
 }
 
 function loop(now) {
   const rawDt = Math.min(0.05, (now - lastTime) / 1000);
   lastTime = now;
-  const dt = rawDt * gameSpeed;
-  update(dt);
+  update(rawDt * gameSpeed);
   draw();
   if (pendingLevelUps > 0 && !paused && !gameOver) showLevelUpChoices();
   gameLoopId = requestAnimationFrame(loop);
 }
 
 function stopLoop() {
-  if (gameLoopId !== null) {
-    cancelAnimationFrame(gameLoopId);
-    gameLoopId = null;
-  }
+  if (gameLoopId !== null) { cancelAnimationFrame(gameLoopId); gameLoopId = null; }
 }
 
 function beginGame() {
   stopLoop();
-  try {
-    AudioEngine.init();
-    AudioEngine.resume();
-  } catch (err) { console.warn('Audio init failed:', err); }
+  try { AudioEngine.init(); AudioEngine.resume(); } catch (err) { console.warn(err); }
   overlayEl.classList.add('hidden');
   levelupEl.classList.add('hidden');
   speedBar.classList.remove('hidden');
