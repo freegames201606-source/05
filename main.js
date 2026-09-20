@@ -1,5 +1,5 @@
 /* =========================================================
-   Vansaba - 一段階 + D + E + F + 難易度/速度（完全版）
+   Vansaba - 一段階 + 速度切替
    ========================================================= */
 
 const canvas = document.getElementById('game');
@@ -10,9 +10,7 @@ const overlayEl = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayMsg = document.getElementById('overlay-msg');
 const overlayHelp = document.getElementById('overlay-help');
-const hiscoreValue = document.getElementById('hiscore-value');
 const startBtn = document.getElementById('startBtn');
-const difficultyEl = document.getElementById('difficulty');
 const speedBar = document.getElementById('speed-bar');
 const speedBtn = document.getElementById('speedBtn');
 
@@ -30,18 +28,6 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 resize();
-
-/* ---------- セーフエリア ---------- */
-function getSafeArea() {
-  const cs = getComputedStyle(document.documentElement);
-  const num = v => parseFloat(v) || 0;
-  return {
-    top:    num(cs.getPropertyValue('--sat')),
-    right:  num(cs.getPropertyValue('--sar')),
-    bottom: num(cs.getPropertyValue('--sab')),
-    left:   num(cs.getPropertyValue('--sal')),
-  };
-}
 
 /* =========================================================
    入力
@@ -156,43 +142,6 @@ async function loadAssets() {
   }
 }
 
-/* ---------- セーブ ---------- */
-const SAVE_KEY = 'vansaba_best_time_v1';
-function loadBest() {
-  try {
-    const v = localStorage.getItem(SAVE_KEY);
-    return v ? parseFloat(v) || 0 : 0;
-  } catch (e) { return 0; }
-}
-function saveBest(t) {
-  try { localStorage.setItem(SAVE_KEY, String(t)); } catch (e) {}
-}
-let bestTime = loadBest();
-function refreshHiscoreDisplay() {
-  if (hiscoreValue) hiscoreValue.textContent = bestTime.toFixed(1);
-}
-
-/* ---------- 難易度 ---------- */
-const DIFFICULTIES = {
-  easy:   { label: 'EASY',   enemyHpMul: 0.7, enemySpeedMul: 0.85, spawnMul: 1.25, damageMul: 0.7, expMul: 1.3 },
-  normal: { label: 'NORMAL', enemyHpMul: 1.0, enemySpeedMul: 1.0,  spawnMul: 1.0,  damageMul: 1.0, expMul: 1.0 },
-  hard:   { label: 'HARD',   enemyHpMul: 1.5, enemySpeedMul: 1.15, spawnMul: 0.75, damageMul: 1.4, expMul: 0.85 },
-};
-let difficultyKey = 'normal';
-
-function setupDifficultyUI() {
-  if (!difficultyEl) return;
-  const buttons = difficultyEl.querySelectorAll('.diff-btn');
-  buttons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      buttons.forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      difficultyKey = btn.dataset.diff;
-    });
-  });
-}
-setupDifficultyUI();
-
 /* ---------- ゲーム速度 ---------- */
 let gameSpeed = 1.0;
 
@@ -229,7 +178,6 @@ let bullets = [];
 let orbs = [];
 let effects = [];
 let particles = [];
-let damageNumbers = [];
 let spawnTimer = 0;
 let elapsed = 0;
 let gameOver = false;
@@ -242,27 +190,7 @@ let lastTime = 0;
 let pendingLevelUps = 0;
 let gameLoopId = null;
 
-let hitStop = 0;
-let shake = { time: 0, mag: 0 };
-
-function addHitStop(t) { if (t > hitStop) hitStop = t; }
-function addShake(mag, dur) {
-  shake.mag = Math.max(shake.mag, mag);
-  shake.time = Math.max(shake.time, dur);
-}
-function addDamageNumber(x, y, value, color) {
-  damageNumbers.push({
-    x, y,
-    vx: (Math.random() - 0.5) * 40,
-    vy: -70,
-    life: 0.7, maxLife: 0.7,
-    value: Math.round(value),
-    color: color || '#fff',
-  });
-}
-
 function resetGame() {
-  const diff = DIFFICULTIES[difficultyKey] || DIFFICULTIES.normal;
   player = {
     x: W / 2, y: H / 2, r: 18,
     speed: 240,
@@ -274,7 +202,6 @@ function resetGame() {
   orbs = [];
   effects = [];
   particles = [];
-  damageNumbers = [];
   spawnTimer = 0;
   elapsed = 0;
   gameOver = false;
@@ -283,8 +210,6 @@ function resetGame() {
   exp = 0;
   expNext = 5;
   pendingLevelUps = 0;
-  hitStop = 0;
-  shake = { time: 0, mag: 0 };
   stats = {
     weapons: {
       basic:  { level: 1, timer: 0, interval: 0.55, damage: 10, speed: 460, pierce: 0 },
@@ -296,7 +221,6 @@ function resetGame() {
     moveSpeedMul: 1,
     regen: 0,
     expMul: 1,
-    diff,
   };
   lastTime = performance.now();
 }
@@ -318,7 +242,6 @@ function pickEnemyType() {
 }
 
 function spawnEnemy() {
-  const diff = stats.diff;
   const type = pickEnemyType();
   const edge = Math.floor(Math.random() * 4);
   let x, y;
@@ -327,14 +250,14 @@ function spawnEnemy() {
   else if (edge === 2) { x = Math.random() * W; y = H + 30; }
   else { x = -30; y = Math.random() * H; }
 
-  const hpScale = (1 + elapsed * 0.06) * diff.enemyHpMul;
+  const hpScale = 1 + elapsed * 0.06;
   const hp = type.hp * hpScale;
   enemies.push({
     type, x, y,
     r: type.r,
     hp, maxHp: hp,
-    speed: type.speed * (1 + elapsed * 0.002) * diff.enemySpeedMul,
-    dmg: type.dmg * diff.damageMul,
+    speed: type.speed * (1 + elapsed * 0.002),
+    dmg: type.dmg,
     flash: 0,
   });
 }
@@ -432,7 +355,6 @@ function fireLaser(dt) {
   const len = 1200;
   const x2 = player.x + Math.cos(a) * len;
   const y2 = player.y + Math.sin(a) * len;
-  let hitAny = false;
   for (const e of enemies) {
     const dx = x2 - player.x, dy = y2 - player.y;
     const t = ((e.x - player.x) * dx + (e.y - player.y) * dy) / (dx * dx + dy * dy);
@@ -442,13 +364,10 @@ function fireLaser(dt) {
     if (d < e.r + w.width) {
       e.hp -= w.damage;
       e.flash = 0.15;
-      addDamageNumber(e.x, e.y - e.r - 4, w.damage, '#ff80d0');
-      hitAny = true;
     }
   }
   effects.push({ type: 'laser', x1: player.x, y1: player.y, x2, y2, life: 0.18, maxLife: 0.18 });
   AudioEngine.seShoot();
-  if (hitAny) { addHitStop(0.06); addShake(8, 0.18); }
 }
 
 /* ---------- 更新 ---------- */
@@ -486,8 +405,6 @@ function update(dt) {
         e.flash = 0.1;
         b.hitSet.add(e);
         spawnParticles(b.x, b.y, '#fff', 3);
-        addDamageNumber(e.x, e.y - e.r - 4, b.damage, '#ffe082');
-        addHitStop(0.025);
         if (b.pierce > 0) b.pierce--;
         else { b.life = 0; break; }
       }
@@ -497,7 +414,7 @@ function update(dt) {
 
   spawnTimer -= dt;
   if (spawnTimer <= 0) {
-    const interval = Math.max(0.18, (1.1 - elapsed * 0.012) * stats.diff.spawnMul);
+    const interval = Math.max(0.18, 1.1 - elapsed * 0.012);
     spawnTimer = interval;
     spawnEnemy();
     if (elapsed > 45 && Math.random() < 0.4) spawnEnemy();
@@ -518,9 +435,6 @@ function update(dt) {
       player.invuln = 0.4;
       AudioEngine.seHit();
       spawnParticles(player.x, player.y, '#f66', 8);
-      addDamageNumber(player.x, player.y - player.r - 6, e.dmg, '#ff5252');
-      addShake(10, 0.22);
-      addHitStop(0.05);
     }
   }
 
@@ -529,8 +443,6 @@ function update(dt) {
     if (e.hp <= 0) {
       orbs.push({ x: e.x, y: e.y, r: 5, exp: e.type.exp });
       spawnParticles(e.x, e.y, e.type.color, 8);
-      addHitStop(0.04);
-      addShake(4, 0.1);
     } else {
       alive.push(e);
     }
@@ -550,7 +462,7 @@ function update(dt) {
   for (const o of orbs) {
     const d = (player.x - o.x) ** 2 + (player.y - o.y) ** 2;
     if (d < (player.r + o.r) ** 2) {
-      exp += o.exp * stats.expMul * stats.diff.expMul;
+      exp += o.exp * stats.expMul;
       while (exp >= expNext) {
         exp -= expNext;
         level++;
@@ -568,14 +480,6 @@ function update(dt) {
   }
   particles = particles.filter(p => p.life > 0);
 
-  for (const dn of damageNumbers) {
-    dn.x += dn.vx * dt;
-    dn.y += dn.vy * dt;
-    dn.vy += 140 * dt;
-    dn.life -= dt;
-  }
-  damageNumbers = damageNumbers.filter(dn => dn.life > 0);
-
   for (const ef of effects) ef.life -= dt;
   effects = effects.filter(ef => ef.life > 0);
 
@@ -584,16 +488,7 @@ function update(dt) {
     gameOver = true;
     AudioEngine.stopBGM();
     AudioEngine.seGameOver();
-    addShake(20, 0.5);
-
-    if (elapsed > bestTime) {
-      bestTime = elapsed;
-      saveBest(bestTime);
-      refreshHiscoreDisplay();
-      showOverlay('GAME OVER', '自己ベスト更新！ ' + elapsed.toFixed(1) + '秒 / Lv.' + level, 'RETRY');
-    } else {
-      showOverlay('GAME OVER', '生存 ' + elapsed.toFixed(1) + '秒 / Lv.' + level, 'RETRY');
-    }
+    showOverlay('GAME OVER', `生存 ${elapsed.toFixed(1)}秒 / Lv.${level}`, 'RETRY');
     stopLoop();
   }
 }
@@ -634,12 +529,11 @@ function showLevelUpChoices() {
   for (const up of picked) {
     const div = document.createElement('div');
     div.className = 'choice';
-    div.innerHTML = '<div class="name">' + up.name + '</div><div class="desc">' + up.desc + '</div>';
+    div.innerHTML = `<div class="name">${up.name}</div><div class="desc">${up.desc}</div>`;
     div.addEventListener('click', () => {
       up.apply(stats);
       pendingLevelUps--;
       AudioEngine.seLevelUp();
-      addShake(6, 0.15);
       showLevelUpChoices();
     });
     choicesEl.appendChild(div);
@@ -652,17 +546,8 @@ function drawImageCentered(img, x, y, size) {
 }
 
 function draw() {
-  let ox = 0, oy = 0;
-  if (shake.time > 0) {
-    ox = (Math.random() - 0.5) * 2 * shake.mag;
-    oy = (Math.random() - 0.5) * 2 * shake.mag;
-  }
-
-  ctx.save();
-  ctx.translate(ox, oy);
-
   ctx.fillStyle = '#0d0d12';
-  ctx.fillRect(-50, -50, W + 100, H + 100);
+  ctx.fillRect(0, 0, W, H);
 
   ctx.strokeStyle = 'rgba(255,255,255,0.03)';
   ctx.lineWidth = 1;
@@ -708,20 +593,20 @@ function draw() {
     if (w.level > 0) {
       for (let i = 0; i < w.count; i++) {
         const a = w.angle + (Math.PI * 2 / w.count) * i;
-        const ox2 = player.x + Math.cos(a) * w.radius;
-        const oy2 = player.y + Math.sin(a) * w.radius;
+        const ox = player.x + Math.cos(a) * w.radius;
+        const oy = player.y + Math.sin(a) * w.radius;
         ctx.fillStyle = '#b388ff';
-        ctx.beginPath(); ctx.arc(ox2, oy2, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(ox, oy, 12, 0, Math.PI * 2); ctx.fill();
       }
     }
 
     for (const ef of effects) {
       if (ef.type === 'laser') {
         const alpha = ef.life / ef.maxLife;
-        ctx.strokeStyle = 'rgba(255,80,180,' + alpha + ')';
+        ctx.strokeStyle = `rgba(255,80,180,${alpha})`;
         ctx.lineWidth = 6;
         ctx.beginPath(); ctx.moveTo(ef.x1, ef.y1); ctx.lineTo(ef.x2, ef.y2); ctx.stroke();
-        ctx.strokeStyle = 'rgba(255,255,255,' + alpha + ')';
+        ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(ef.x1, ef.y1); ctx.lineTo(ef.x2, ef.y2); ctx.stroke();
       }
@@ -741,30 +626,4 @@ function draw() {
       ctx.fillStyle = '#4fc3f7';
       ctx.beginPath(); ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2); ctx.fill();
     }
-    ctx.globalAlpha = 1;
-
-    ctx.font = 'bold 15px sans-serif';
-    ctx.textAlign = 'center';
-    for (const dn of damageNumbers) {
-      const alpha = dn.life / dn.maxLife;
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = dn.color;
-      ctx.fillText(String(dn.value), dn.x, dn.y);
-    }
-    ctx.globalAlpha = 1;
-    ctx.textAlign = 'left';
-  }
-
-  if (stick.active) {
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(stick.baseX, stick.baseY, stick.maxDist, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.fillStyle = 'rgba(79,195,247,0.5)';
-    ctx.beginPath();
-    ctx.arc(stick.baseX, stick.baseY, 10, 0, Math.PI * 2);
-    ctx.fill();
-
-    const dx
+    ctx.globalAlpha
