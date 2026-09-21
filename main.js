@@ -181,14 +181,11 @@ function vibrate(ms) {
   }
 }
 
-/* ---- 敵タイプ ----
-   name: 頭上に表示するキャラ名（null なら非表示）
-   drawScale: 描画サイズの倍率（1.0 で標準）
-*/
+/* ---- 敵タイプ ---- */
 const ENEMY_TYPES = [
-  { key: 'dog',    hp: 9,  speed: 85,  r: 15, dmg: 20, exp: 4,  color: '#e0a060', name: null,      drawScale: 1.0 },
-  { key: 'cat',    hp: 6,  speed: 100, r: 13, dmg: 16, exp: 5,  color: '#c0c0c0', name: null,      drawScale: 1.0 },
-  { key: 'panda',  hp: 30, speed: 55,  r: 21, dmg: 40, exp: 14, color: '#222222', name: null,      drawScale: 1.0 },
+  { key: 'dog',    hp: 9,  speed: 85,  r: 15, dmg: 20, exp: 4,  color: '#e0a060', name: null,       drawScale: 1.0 },
+  { key: 'cat',    hp: 6,  speed: 100, r: 13, dmg: 16, exp: 5,  color: '#c0c0c0', name: null,       drawScale: 1.0 },
+  { key: 'panda',  hp: 30, speed: 55,  r: 21, dmg: 40, exp: 14, color: '#222222', name: 'かんま',   drawScale: 1.0 },
   { key: 'rabbit', hp: 5,  speed: 130, r: 18, dmg: 14, exp: 6,  color: '#ffd0e0', name: 'いっさん', drawScale: 1.5 },
 ];
 
@@ -244,8 +241,8 @@ function pickEnemyType() {
   const pool = [
     { type: ENEMY_TYPES[0], w: 5 },
     { type: ENEMY_TYPES[1], w: t > 15 ? 4 : 0 },
-    { type: ENEMY_TYPES[3], w: t > 30 ? 3 : 0 },
-    { type: ENEMY_TYPES[2], w: t > 60 ? 2 : 0 },
+    { type: ENEMY_TYPES[3], w: t > 30 ? 0.5 : 0 },
+    { type: ENEMY_TYPES[2], w: t > 60 ? 0.5 : 0 },
   ];
   let total = 0;
   for (const p of pool) total += p.w;
@@ -561,9 +558,12 @@ function draw() {
   ctx.save();
   ctx.translate(ox, oy);
 
-  ctx.fillStyle = '#0d0d12';
+  /* 背景：濃紺 */
+  ctx.fillStyle = '#0f1424';
   ctx.fillRect(-50, -50, W + 100, H + 100);
-  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+
+  /* グリッド（背景に合わせて水色寄り） */
+  ctx.strokeStyle = 'rgba(120,180,255,0.06)';
   ctx.lineWidth = 1;
   const g = 60;
   for (let x = 0; x < W; x += g) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
@@ -591,7 +591,6 @@ function draw() {
         ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2); ctx.fill();
       }
 
-      /* HPバー */
       const w = e.r * 2;
       const ratio = Math.max(0, e.hp / e.maxHp);
       const barY = e.y - e.r - 9;
@@ -600,7 +599,6 @@ function draw() {
       ctx.fillStyle = '#4caf50';
       ctx.fillRect(e.x - e.r, barY, w * ratio, 4);
 
-      /* キャラ名（HPバーの上） */
       if (e.type.name) {
         ctx.font = 'bold 13px sans-serif';
         ctx.textAlign = 'center';
