@@ -181,12 +181,15 @@ function vibrate(ms) {
   }
 }
 
-/* ---- 敵タイプ ---- */
+/* ---- 敵タイプ ----
+   name: 頭上に表示するキャラ名（null なら非表示）
+   drawScale: 描画サイズの倍率（1.0 で標準）
+*/
 const ENEMY_TYPES = [
-  { key: 'dog',    hp: 9,  speed: 85,  r: 15, dmg: 20, exp: 4,  color: '#e0a060' },
-  { key: 'cat',    hp: 6,  speed: 130, r: 13, dmg: 16, exp: 5,  color: '#c0c0c0' },
-  { key: 'panda',  hp: 30, speed: 55,  r: 21, dmg: 40, exp: 14, color: '#222222' },
-  { key: 'rabbit', hp: 5,  speed: 170, r: 12, dmg: 14, exp: 6,  color: '#ffd0e0' },
+  { key: 'dog',    hp: 9,  speed: 85,  r: 15, dmg: 20, exp: 4,  color: '#e0a060', name: null,      drawScale: 1.0 },
+  { key: 'cat',    hp: 6,  speed: 100, r: 13, dmg: 16, exp: 5,  color: '#c0c0c0', name: null,      drawScale: 1.0 },
+  { key: 'panda',  hp: 30, speed: 55,  r: 21, dmg: 40, exp: 14, color: '#222222', name: null,      drawScale: 1.0 },
+  { key: 'rabbit', hp: 5,  speed: 130, r: 18, dmg: 14, exp: 6,  color: '#ffd0e0', name: 'いっさん', drawScale: 1.5 },
 ];
 
 let player = null;
@@ -573,7 +576,9 @@ function draw() {
     }
     for (const e of enemies) {
       const img = images.enemies[e.type.key];
-      const size = e.r * 2.6;
+      const drawScale = e.type.drawScale || 1.0;
+      const size = e.r * 2.6 * drawScale;
+
       if (img) {
         drawImageCentered(img, e.x, e.y, size);
         if (e.flash > 0) {
@@ -585,12 +590,31 @@ function draw() {
         ctx.fillStyle = e.flash > 0 ? '#fff' : e.type.color;
         ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2); ctx.fill();
       }
+
+      /* HPバー */
       const w = e.r * 2;
       const ratio = Math.max(0, e.hp / e.maxHp);
+      const barY = e.y - e.r - 9;
       ctx.fillStyle = 'rgba(0,0,0,0.6)';
-      ctx.fillRect(e.x - e.r, e.y - e.r - 9, w, 4);
+      ctx.fillRect(e.x - e.r, barY, w, 4);
       ctx.fillStyle = '#4caf50';
-      ctx.fillRect(e.x - e.r, e.y - e.r - 9, w * ratio, 4);
+      ctx.fillRect(e.x - e.r, barY, w * ratio, 4);
+
+      /* キャラ名（HPバーの上） */
+      if (e.type.name) {
+        ctx.font = 'bold 13px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        const tx = e.x;
+        const ty = barY - 3;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+        ctx.strokeText(e.type.name, tx, ty);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(e.type.name, tx, ty);
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+      }
     }
     for (const b of bullets) {
       ctx.fillStyle = b.color || '#ffd54f';
