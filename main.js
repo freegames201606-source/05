@@ -185,8 +185,8 @@ function vibrate(ms) {
 const ENEMY_TYPES = [
   { key: 'dog',    hp: 9,  speed: 85,  r: 15, dmg: 20, exp: 4,  color: '#e0a060', name: null,       drawScale: 1.0 },
   { key: 'cat',    hp: 6,  speed: 100, r: 13, dmg: 16, exp: 5,  color: '#c0c0c0', name: null,       drawScale: 1.0 },
-  { key: 'panda',  hp: 30, speed: 55,  r: 21, dmg: 40, exp: 14, color: '#222222', name: 'かんま',   drawScale: 1.0 },
-  { key: 'rabbit', hp: 5,  speed: 130, r: 18, dmg: 14, exp: 6,  color: '#ffd0e0', name: 'いっさん', drawScale: 1.5 },
+  { key: 'panda',  hp: 30, speed: 55,  r: 21, dmg: 40, exp: 14, color: '#222222', name: 'かんま',   drawScale: 1.5 },
+  { key: 'rabbit', hp: 10, speed: 110, r: 18, dmg: 14, exp: 6,  color: '#ffd0e0', name: 'いっさん', drawScale: 1.5 },
 ];
 
 let player = null;
@@ -199,6 +199,7 @@ let stats = null, lastTime = 0, pendingLevelUps = 0, gameLoopId = null;
 let hitStop = 0;
 let shake = { time: 0, mag: 0 };
 let redFlash = 0;
+let playerBarFlash = 0;
 
 function addHitStop(t) { if (t > hitStop) hitStop = t; }
 function addShake(mag, dur) {
@@ -222,7 +223,7 @@ function resetGame() {
   enemies = []; bullets = []; orbs = []; effects = []; particles = []; damageNumbers = [];
   spawnTimer = 0; elapsed = 0; gameOver = false; paused = false; pauseRequested = false;
   level = 1; exp = 0; expNext = 5; pendingLevelUps = 0;
-  hitStop = 0; shake = { time: 0, mag: 0 }; redFlash = 0;
+  hitStop = 0; shake = { time: 0, mag: 0 }; redFlash = 0; playerBarFlash = 0;
   stats = {
     weapons: {
       basic:  { level: 1, timer: 0, interval: 0.55, damage: 10, speed: 460, pierce: 0 },
@@ -241,8 +242,8 @@ function pickEnemyType() {
   const pool = [
     { type: ENEMY_TYPES[0], w: 5 },
     { type: ENEMY_TYPES[1], w: t > 15 ? 4 : 0 },
-    { type: ENEMY_TYPES[3], w: t > 30 ? 0.5 : 0 },
-    { type: ENEMY_TYPES[2], w: t > 60 ? 0.5 : 0 },
+    { type: ENEMY_TYPES[3], w: t > 20 ? 0.5 : 0 },
+    { type: ENEMY_TYPES[2], w: t > 50 ? 0.5 : 0 },
   ];
   let total = 0;
   for (const p of pool) total += p.w;
@@ -424,6 +425,7 @@ function update(dt) {
       addShake(10, 0.22);
       addHitStop(0.05);
       redFlash = 0.25;
+      playerBarFlash = 0.4;
       vibrate(30);
     }
   }
@@ -548,6 +550,13 @@ function drawImageCentered(img, x, y, size) {
   ctx.drawImage(img, x - size / 2, y - size / 2, size, size);
 }
 
+/* HP割合に応じた色（緑→黄→赤） */
+function hpColor(ratio) {
+  if (ratio > 0.6) return '#4caf50';
+  if (ratio > 0.3) return '#ffd54f';
+  return '#f44336';
+}
+
 function draw() {
   let ox = 0, oy = 0;
   if (shake.time > 0) {
@@ -558,11 +567,9 @@ function draw() {
   ctx.save();
   ctx.translate(ox, oy);
 
-  /* 背景：濃紺 */
   ctx.fillStyle = '#0f1424';
   ctx.fillRect(-50, -50, W + 100, H + 100);
 
-  /* グリッド（背景に合わせて水色寄り） */
   ctx.strokeStyle = 'rgba(120,180,255,0.06)';
   ctx.lineWidth = 1;
   const g = 60;
@@ -654,6 +661,27 @@ function draw() {
     }
     ctx.globalAlpha = 1;
 
+    /* 主人公のHPバー（頭上） */
+    {
+      const barW = 44;
+      const barH = 5;
+      const barX = player.x - barW / 2;
+      const barY = player.y - player.r - 14;
+      const ratio = Math.max(0, player.hp / player.maxHp);
+
+      /* 背景 */
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+
+      /* HP色（点滅中は赤） */
+      let color = hpColor(ratio);
+      if (playerBarFlash > 0 && Math.floor(playerBarFlash * 20) % 2 === 0) {
+        color = '#ff1744';
+      }
+      ctx.fillStyle = color;
+      ctx.fillRect(barX, barY, barW * ratio, barH);
+    }
+
     ctx.font = 'bold 15px sans-serif';
     ctx.textAlign = 'center';
     for (const dn of damageNumbers) {
@@ -729,6 +757,7 @@ function loop(now) {
     if (shake.time <= 0) { shake.time = 0; shake.mag = 0; }
   }
   if (redFlash > 0) redFlash -= rawDt;
+  if (playerBarFlash > 0) playerBarFlash -= rawDt;
 
   update(dt);
   draw();
